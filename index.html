@@ -9,13 +9,14 @@
 
 </head>
 <body>
-<div id="authScreen" class="auth-screen">
-  <div class="auth-card">
-    <div class="auth-brand">Tailor<span>Pro</span></div>
-    <div class="auth-subbrand">Tailoring Management System</div>
-    <h2 id="authTitle">Welcome back</h2>
-    <p id="authSubtitle" class="auth-help">Login to continue to your tailoring business.</p>
-    <div id="authMessage" class="auth-message hidden"></div>
+<div id="authScreen" class="auth-screen" style="
+  background-image:
+    linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.45)),
+    url('./login-background.jpg') !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+">
 
     <form id="loginForm" class="auth-form" onsubmit="login(event)">
       <div class="auth-field"><label>Email address</label><input id="loginEmail" type="email" autocomplete="username" required placeholder="you@example.com"></div>
