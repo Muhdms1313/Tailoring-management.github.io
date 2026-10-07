@@ -36,8 +36,19 @@
 </section>
 
 <section id="orders" class="page">
-<div class="toolbar"><input id="orderSearch" class="search" placeholder="Search order or customer..." oninput="renderOrders()"><select id="orderStatusFilter" onchange="renderOrders()"><option value="">All statuses</option><option>Received</option><option>Cutting</option><option>Sewing</option><option>Finishing</option><option>Ready for Collection</option><option>Delivered</option></select><button class="btn" onclick="openOrder()">+ New Order</button></div>
-<div class="section"><div class="tablewrap"><table class="table"><thead><tr><th>Order #</th><th>Customer</th><th>Outfit</th><th>Received</th><th>Collection</th><th>Status</th><th>Total</th><th>Balance</th></tr></thead><tbody id="orderRows"></tbody></table></div></div>
+<div class="orders-header">
+  <div><h2 class="page-section-title">Order Management</h2><p class="muted">Create, track, edit, collect payments and print receipts for every tailoring order.</p></div>
+  <button class="btn" onclick="openOrder()">+ New Order</button>
+</div>
+<div class="order-toolbar">
+  <input id="orderSearch" class="search" placeholder="Search order, customer or outfit..." oninput="renderOrders()">
+  <select id="orderStatusFilter" onchange="renderOrders()"><option value="">All statuses</option><option>Received</option><option>Cutting</option><option>Sewing</option><option>Finishing</option><option>Ready for Collection</option><option>Delivered</option></select>
+  <select id="orderPriorityFilter" onchange="renderOrders()"><option value="">All priorities</option><option>Normal</option><option>Urgent</option></select>
+  <select id="orderDueFilter" onchange="renderOrders()"><option value="">All dates</option><option value="today">Due today</option><option value="upcoming">Upcoming</option><option value="overdue">Overdue</option></select>
+  <button class="btn secondary" onclick="document.getElementById('orderSearch').value='';document.getElementById('orderStatusFilter').value='';document.getElementById('orderPriorityFilter').value='';document.getElementById('orderDueFilter').value='';renderOrders()">Clear Filters</button>
+</div>
+<div class="order-summary-strip"><span id="orderCount">0 orders</span><span>Statuses: Received → Cutting → Sewing → Finishing → Ready for Collection → Delivered</span></div>
+<div class="section"><div class="tablewrap orders-table-wrap"><table class="table orders-table"><thead><tr><th>Order</th><th>Customer</th><th>Outfit</th><th>Material Received</th><th>Collection</th><th>Status</th><th>Total</th><th>Balance</th><th>Actions</th></tr></thead><tbody id="orderRows"></tbody></table></div></div>
 </section>
 
 <section id="payments" class="page">
