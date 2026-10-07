@@ -5,15 +5,44 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TailorPro Manager</title>
 <link rel="stylesheet" href="styles.css">
+
+
 </head>
 <body>
-<div class="app">
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-brand">Tailor<span>Pro</span></div>
+    <div class="auth-subbrand">Tailoring Management System</div>
+    <h2 id="authTitle">Welcome back</h2>
+    <p id="authSubtitle" class="auth-help">Login to continue to your tailoring business.</p>
+    <div id="authMessage" class="auth-message hidden"></div>
+
+    <form id="loginForm" class="auth-form" onsubmit="login(event)">
+      <div class="auth-field"><label>Email address</label><input id="loginEmail" type="email" autocomplete="username" required placeholder="you@example.com"></div>
+      <div class="auth-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required placeholder="Your password"></div>
+      <button class="auth-submit" type="submit">Login</button>
+      <div class="auth-switch">Don't have an account? <button type="button" onclick="switchAuth('signup')">Sign up</button></div>
+    </form>
+
+    <form id="signupForm" class="auth-form hidden" onsubmit="signUp(event)">
+      <div class="auth-field"><label>Full name</label><input id="signupName" autocomplete="name" required placeholder="Your full name"></div>
+      <div class="auth-field"><label>Shop / Business name</label><input id="signupShop" autocomplete="organization" required placeholder="Your tailoring shop"></div>
+      <div class="auth-field"><label>Email address</label><input id="signupEmail" type="email" autocomplete="username" required placeholder="you@example.com"></div>
+      <div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters"></div>
+      <div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" minlength="6" required placeholder="Repeat your password"></div>
+      <button class="auth-submit" type="submit">Create Account</button>
+      <div class="auth-switch">Already have an account? <button type="button" onclick="switchAuth('login')">Login</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="appShell" class="app auth-locked">
 <aside class="side"><div class="brand">TailorPro<small>Tailoring Management System</small></div><div class="nav">
 <button data-page="dashboard" class="active">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button><button data-page="settings">Settings</button>
 </div></aside>
 <div class="mobilebar"><button data-page="dashboard">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button><button data-page="settings">Settings</button></div>
 <main class="main">
-<div class="top"><div><h1 id="pageTitle">Dashboard</h1><div class="muted">Manage your tailoring business in one place.</div></div><div class="toolbar"><button class="btn secondary" onclick="backupData()">Backup</button><button class="btn" onclick="openCustomer()">+ New Customer</button></div></div>
+<div class="top"><div><h1 id="pageTitle">Dashboard</h1><div class="muted">Manage your tailoring business in one place.</div></div><div class="toolbar"><button class="btn secondary" onclick="backupData()">Backup</button><button class="btn" onclick="openCustomer()">+ New Customer</button><div class="account-bar"><span id="accountName" class="account-name"></span><button class="logout-btn" onclick="logout()">Logout</button></div></div></div>
 
 <section id="dashboard" class="page active">
 <div class="grid">
@@ -72,6 +101,7 @@
 </div>
 </section>
 </main></div>
+</div>
 
 <div id="modal" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2 id="modalTitle"></h2><button class="x" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
 <script src="app.js"></script>
