@@ -63,22 +63,23 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{display:fle
 
 /* TailorPro Login Background */
 
-#authScreen {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 9999 !important;
+.auth-screen{
+    position:fixed;
+    inset:0;
+    z-index:9999;
 
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    display:flex;
+    align-items:center;
+    justify-content:center;
 
-    width: 100% !important;
-    min-height: 100vh !important;
+    padding:18px;
 
     background:
         linear-gradient(
-            rgba(0, 0, 0, 0.45),
-            rgba(0, 0, 0, 0.60)
+            rgba(0,0,0,.35),
+            rgba(0,0,0,.55)
         ),
         url("./login-background.jpg") center center / cover no-repeat !important;
-}
+
+    overflow:auto;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              }
