@@ -1,5 +1,429 @@
-/* TailorPro Manager - Orders Edition */
-const KEY = "tailorpro_v2";
+/* =====================================================
+   TAILORPRO ACCOUNT AUTHENTICATION
+   Browser-only prototype authentication.
+   Accounts are stored in localStorage; for production use a
+   real backend/database with server-side authentication.
+   ===================================================== */
+
+const AUTH_USERS_KEY = "tailorpro_accounts_v1";
+const AUTH_SESSION_KEY = "tailorpro_session_v1";
+const LEGACY_DATA_KEY = "tailorpro_v2";
+
+function authUsers(){
+  try{
+    const users = JSON.parse(localStorage.getItem(AUTH_USERS_KEY) || "[]");
+    return Array.isArray(users) ? users : [];
+  }catch(e){
+    return [];
+  }
+}
+
+function currentUser(){
+  try{
+    const id = localStorage.getItem(AUTH_SESSION_KEY);
+    if(!id) return null;
+
+    return authUsers().find(u => u.id === id) || null;
+  }catch(e){
+    return null;
+  }
+}
+
+async function hashPassword(password){
+  if(window.crypto?.subtle){
+    const data = new TextEncoder().encode(password);
+
+    const hash = await crypto.subtle.digest(
+      "SHA-256",
+      data
+    );
+
+    return Array.from(
+      new Uint8Array(hash)
+    )
+    .map(b => b.toString(16).padStart(2,"0"))
+    .join("");
+  }
+
+  /* Fallback for very old browsers */
+  let h = 2166136261;
+
+  for(let i = 0; i < password.length; i++){
+    h = Math.imul(
+      h ^ password.charCodeAt(i),
+      16777619
+    );
+  }
+
+  return (h >>> 0).toString(16);
+}
+
+
+/* =====================================================
+   AUTH SCREEN
+   ===================================================== */
+
+function showAuth(mode = "login", message = ""){
+  const screen = document.getElementById("authScreen");
+
+  if(!screen) return;
+
+  screen.classList.remove("hidden");
+
+  document
+    .getElementById("appShell")
+    ?.classList.add("auth-locked");
+
+  const login =
+    document.getElementById("loginForm");
+
+  const signup =
+    document.getElementById("signupForm");
+
+  if(login){
+    login.classList.toggle(
+      "hidden",
+      mode !== "login"
+    );
+  }
+
+  if(signup){
+    signup.classList.toggle(
+      "hidden",
+      mode !== "signup"
+    );
+  }
+
+  const title =
+    document.getElementById("authTitle");
+
+  const sub =
+    document.getElementById("authSubtitle");
+
+  if(title){
+    title.textContent =
+      mode === "signup"
+        ? "Create your TailorPro account"
+        : "Welcome back";
+  }
+
+  if(sub){
+    sub.textContent =
+      mode === "signup"
+        ? "Create an account to protect access to your tailoring records."
+        : "Login to continue to your tailoring business.";
+  }
+
+  const msg =
+    document.getElementById("authMessage");
+
+  if(msg){
+    msg.textContent = message;
+
+    msg.classList.toggle(
+      "hidden",
+      !message
+    );
+  }
+}
+
+
+function hideAuth(){
+
+  document
+    .getElementById("authScreen")
+    ?.classList.add("hidden");
+
+  document
+    .getElementById("appShell")
+    ?.classList.remove("auth-locked");
+
+  const u = currentUser();
+
+  const el =
+    document.getElementById("accountName");
+
+  if(el && u){
+    el.textContent =
+      `${u.name} · ${u.shop}`;
+  }
+}
+
+
+function setAuthMessage(message){
+
+  const msg =
+    document.getElementById("authMessage");
+
+  if(msg){
+    msg.textContent = message;
+
+    msg.classList.remove("hidden");
+  }
+}
+
+
+/* =====================================================
+   SIGN UP
+   ===================================================== */
+
+async function signUp(event){
+
+  event.preventDefault();
+
+  const name =
+    document
+      .getElementById("signupName")
+      .value
+      .trim();
+
+  const shop =
+    document
+      .getElementById("signupShop")
+      .value
+      .trim();
+
+  const email =
+    document
+      .getElementById("signupEmail")
+      .value
+      .trim()
+      .toLowerCase();
+
+  const password =
+    document.getElementById(
+      "signupPassword"
+    ).value;
+
+  const confirm =
+    document.getElementById(
+      "signupConfirm"
+    ).value;
+
+
+  if(name.length < 2){
+    setAuthMessage(
+      "Please enter your full name."
+    );
+    return;
+  }
+
+
+  if(shop.length < 2){
+    setAuthMessage(
+      "Please enter your shop name."
+    );
+    return;
+  }
+
+
+  if(!/^\S+@\S+\.\S+$/.test(email)){
+    setAuthMessage(
+      "Please enter a valid email address."
+    );
+    return;
+  }
+
+
+  if(password.length < 6){
+    setAuthMessage(
+      "Password must be at least 6 characters."
+    );
+    return;
+  }
+
+
+  if(password !== confirm){
+    setAuthMessage(
+      "Passwords do not match."
+    );
+    return;
+  }
+
+
+  const users = authUsers();
+
+
+  if(
+    users.some(
+      u => u.email === email
+    )
+  ){
+
+    showAuth(
+      "login",
+      "An account with this email already exists. Please login."
+    );
+
+    return;
+  }
+
+
+  const id =
+    generateId("USR");
+
+
+  users.push({
+    id,
+    name,
+    shop,
+    email,
+    passwordHash:
+      await hashPassword(password),
+    createdAt:
+      new Date().toISOString()
+  });
+
+
+  localStorage.setItem(
+    AUTH_USERS_KEY,
+    JSON.stringify(users)
+  );
+
+
+  localStorage.setItem(
+    AUTH_SESSION_KEY,
+    id
+  );
+
+
+  /*
+    Preserve existing prototype data
+    for the first account.
+  */
+
+  const userKey =
+    "tailorpro_v2_user_" + id;
+
+
+  if(
+    !localStorage.getItem(userKey) &&
+    localStorage.getItem(LEGACY_DATA_KEY)
+  ){
+
+    localStorage.setItem(
+      userKey,
+      localStorage.getItem(
+        LEGACY_DATA_KEY
+      )
+    );
+  }
+
+
+  window.location.reload();
+}
+
+
+/* =====================================================
+   LOGIN
+   ===================================================== */
+
+async function login(event){
+
+  event.preventDefault();
+
+
+  const email =
+    document
+      .getElementById("loginEmail")
+      .value
+      .trim()
+      .toLowerCase();
+
+
+  const password =
+    document.getElementById(
+      "loginPassword"
+    ).value;
+
+
+  const user =
+    authUsers().find(
+      u => u.email === email
+    );
+
+
+  if(!user){
+
+    setAuthMessage(
+      "Account not found. Please check your email or sign up."
+    );
+
+    return;
+  }
+
+
+  const hash =
+    await hashPassword(password);
+
+
+  if(hash !== user.passwordHash){
+
+    setAuthMessage(
+      "Incorrect password. Please try again."
+    );
+
+    return;
+  }
+
+
+  localStorage.setItem(
+    AUTH_SESSION_KEY,
+    user.id
+  );
+
+
+  window.location.reload();
+}
+
+
+/* =====================================================
+   LOGOUT
+   ===================================================== */
+
+function logout(){
+
+  if(
+    confirm(
+      "Log out of TailorPro?"
+    )
+  ){
+
+    localStorage.removeItem(
+      AUTH_SESSION_KEY
+    );
+
+    window.location.reload();
+  }
+}
+
+
+function switchAuth(mode){
+
+  showAuth(mode);
+
+}
+
+
+/* =====================================================
+   CURRENT USER
+   ===================================================== */
+
+const SESSION_USER =
+  currentUser();
+
+
+const KEY =
+  SESSION_USER
+    ? "tailorpro_v2_user_" +
+      SESSION_USER.id
+    : "tailorpro_v2_guest";
+
+
+/* =====================================================
+   TAILORPRO MANAGER
+   ===================================================== */
+
 const STATUSES = [
   "Received",
   "Cutting",
@@ -8,148 +432,229 @@ const STATUSES = [
   "Ready for Collection",
   "Delivered"
 ];
-const PRIORITIES = ["Normal","Urgent"];
+
+
+const PRIORITIES = [
+  "Normal",
+  "Urgent"
+];
+
 
 function emptyDB(){
+
   return {
-    customers:[],
-    measurements:[],
-    orders:[],
-    payments:[]
+    customers: [],
+    measurements: [],
+    orders: [],
+    payments: []
   };
+
 }
 
+
 function loadDB(){
+
   try{
-    const raw = JSON.parse(
-      localStorage.getItem(KEY) || "null"
-    );
+
+    const raw =
+      JSON.parse(
+        localStorage.getItem(KEY) ||
+        "null"
+      );
+
 
     const d =
-      raw && typeof raw === "object"
+      raw &&
+      typeof raw === "object"
         ? raw
         : emptyDB();
+
 
     d.customers =
       Array.isArray(d.customers)
         ? d.customers
         : [];
 
+
     d.measurements =
       Array.isArray(d.measurements)
         ? d.measurements
         : [];
+
 
     d.orders =
       Array.isArray(d.orders)
         ? d.orders
         : [];
 
+
     d.payments =
       Array.isArray(d.payments)
         ? d.payments
         : [];
 
-    d.orders.forEach(o=>{
+
+    d.orders.forEach(o => {
+
       o.status =
         STATUSES.includes(o.status)
           ? o.status
           : "Received";
+
 
       o.priority =
         PRIORITIES.includes(o.priority)
           ? o.priority
           : "Normal";
 
-      o.total = Number(o.total || 0);
-      o.paid = Number(o.paid || 0);
-      o.quantity = Number(o.quantity || 1);
 
-      o.notes = o.notes || "";
+      o.total =
+        Number(o.total || 0);
 
-      /* New: remember the measurement used */
+
+      o.paid =
+        Number(o.paid || 0);
+
+
+      o.quantity =
+        Number(o.quantity || 1);
+
+
+      o.notes =
+        o.notes || "";
+
+
       o.measurementId =
         o.measurementId || "";
+
     });
+
 
     return d;
 
   }catch(e){
+
     return emptyDB();
+
   }
+
 }
+
 
 let db = loadDB();
 
-const $ = id =>
-  document.getElementById(id);
 
-const money = n =>
-  "₦" +
-  Number(n || 0).toLocaleString(
-    "en-NG",
-    {
-      maximumFractionDigits:2
-    }
-  );
+/* =====================================================
+   HELPERS
+   ===================================================== */
+
+const $ =
+  id => document.getElementById(id);
+
+
+const money =
+  n =>
+    "₦" +
+    Number(n || 0).toLocaleString(
+      "en-NG",
+      {
+        maximumFractionDigits: 2
+      }
+    );
+
 
 const localDate = () => {
-  const d = new Date();
-  const off = d.getTimezoneOffset();
+
+  const d =
+    new Date();
+
+  const off =
+    d.getTimezoneOffset();
 
   return new Date(
-    d.getTime() - off * 60000
-  ).toISOString().slice(0,10);
+    d.getTime() -
+    off * 60000
+  )
+  .toISOString()
+  .slice(0,10);
+
 };
 
-const today = localDate;
 
-const esc = s =>
-  String(s ?? "").replace(
-    /[&<>"']/g,
-    c => ({
-      "&":"&amp;",
-      "<":"&lt;",
-      ">":"&gt;",
-      '"':"&quot;",
-      "'":"&#39;"
-    }[c])
-  );
+const today =
+  localDate;
 
-const generateId = prefix =>
-  prefix +
-  "-" +
-  Date.now()
-    .toString(36)
-    .toUpperCase() +
-  Math.random()
-    .toString(36)
-    .slice(2,5)
-    .toUpperCase();
 
-const customer = id =>
-  db.customers.find(x=>x.id===id);
+const esc =
+  s =>
+    String(s ?? "")
+      .replace(
+        /[&<>"']/g,
+        c =>
+          ({
+            "&":"&amp;",
+            "<":"&lt;",
+            ">":"&gt;",
+            '"':"&quot;",
+            "'":"&#39;"
+          })[c]
+      );
 
-const order = id =>
-  db.orders.find(x=>x.id===id);
 
-const balance = o =>
-  Math.max(
-    0,
-    Number(o?.total || 0) -
-    Number(o?.paid || 0)
-  );
+const generateId =
+  prefix =>
+    prefix +
+    "-" +
+    Date.now()
+      .toString(36)
+      .toUpperCase() +
+    Math.random()
+      .toString(36)
+      .slice(2,5)
+      .toUpperCase();
+
+
+const customer =
+  id =>
+    db.customers.find(
+      x => x.id === id
+    );
+
+
+const order =
+  id =>
+    db.orders.find(
+      x => x.id === id
+    );
+
+
+const balance =
+  o =>
+    Math.max(
+      0,
+      Number(o?.total || 0) -
+      Number(o?.paid || 0)
+    );
+
 
 function save(){
+
   localStorage.setItem(
     KEY,
     JSON.stringify(db)
   );
 
   refresh();
+
 }
 
+
+/* =====================================================
+   BADGES
+   ===================================================== */
+
 function statusBadge(s){
+
   const c =
     s === "Delivered"
       ? "ok"
@@ -157,62 +662,95 @@ function statusBadge(s){
       ? "warn"
       : s === "Finishing"
       ? "warn"
+      : s === "Received"
+      ? ""
       : "";
+
 
   return `
     <span class="badge ${c}">
       ${esc(s)}
     </span>
   `;
+
 }
+
 
 function priorityBadge(p){
+
   return p === "Urgent"
-    ? `<span class="badge danger">Urgent</span>`
-    : `<span class="badge">Normal</span>`;
+
+    ? `
+      <span class="badge danger">
+        Urgent
+      </span>
+    `
+
+    : `
+      <span class="badge">
+        Normal
+      </span>
+    `;
+
 }
 
+
 function isOverdue(o){
+
   return (
     o.status !== "Delivered" &&
     o.collectionDate &&
     o.collectionDate < today()
   );
+
 }
+
 
 function daysUntil(date){
 
-  if(!date)
-    return null;
+  if(!date) return null;
+
 
   const a =
     new Date(
-      today()+"T00:00:00"
+      today() + "T00:00:00"
     );
+
 
   const b =
     new Date(
-      date+"T00:00:00"
+      date + "T00:00:00"
     );
 
+
   return Math.round(
-    (b-a)/86400000
+    (b - a) / 86400000
   );
+
 }
+
 
 function collectionLabel(o){
 
   const d =
-    daysUntil(o.collectionDate);
+    daysUntil(
+      o.collectionDate
+    );
 
-  if(isOverdue(o))
+
+  if(isOverdue(o)){
+
     return `
       <span class="date-overdue">
         Overdue · ${esc(o.collectionDate)}
       </span>
     `;
 
-  if(d===0)
+  }
+
+
+  if(d === 0){
+
     return `
       <span class="date-today">
         Today
@@ -223,7 +761,11 @@ function collectionLabel(o){
       </small>
     `;
 
-  if(d===1)
+  }
+
+
+  if(d === 1){
+
     return `
       <span class="date-soon">
         Tomorrow
@@ -234,66 +776,106 @@ function collectionLabel(o){
       </small>
     `;
 
+  }
+
+
   return esc(
     o.collectionDate || "—"
   );
+
 }
+
+
+/* =====================================================
+   NAVIGATION
+   ===================================================== */
 
 function nav(page){
 
   document
     .querySelectorAll(".page")
-    .forEach(x =>
-      x.classList.toggle(
-        "active",
-        x.id === page
-      )
+    .forEach(
+      x =>
+        x.classList.toggle(
+          "active",
+          x.id === page
+        )
     );
+
 
   document
     .querySelectorAll("[data-page]")
-    .forEach(x =>
-      x.classList.toggle(
-        "active",
-        x.dataset.page === page
-      )
+    .forEach(
+      x =>
+        x.classList.toggle(
+          "active",
+          x.dataset.page === page
+        )
     );
 
-  if($("pageTitle"))
+
+  if($("pageTitle")){
+
     $("pageTitle").textContent =
       page[0].toUpperCase() +
       page.slice(1);
+
+  }
+
 }
+
 
 document
   .querySelectorAll("[data-page]")
-  .forEach(b =>
-    b.addEventListener(
-      "click",
-      () => nav(b.dataset.page)
-    )
+  .forEach(
+    b =>
+      b.addEventListener(
+        "click",
+        () =>
+          nav(b.dataset.page)
+      )
   );
+
+
+/* =====================================================
+   REFRESH
+   ===================================================== */
 
 function refresh(){
 
   renderDashboard();
+
   renderCustomers();
+
   renderMeasurements();
+
   renderOrders();
+
   renderPayments();
+
   renderReports();
+
   fillCustomerSelects();
+
 }
+
+
+/* =====================================================
+   DASHBOARD
+   ===================================================== */
 
 function renderDashboard(){
 
   $("mCustomers").textContent =
     db.customers.length;
 
+
   $("mActive").textContent =
     db.orders.filter(
-      o => o.status !== "Delivered"
+      o =>
+        o.status !== "Delivered"
     ).length;
+
 
   $("mDue").textContent =
     db.orders.filter(
@@ -302,63 +884,76 @@ function renderDashboard(){
         o.status !== "Delivered"
     ).length;
 
+
   $("mBalance").textContent =
     money(
       db.orders.reduce(
-        (a,o) => a + balance(o),
+        (a,o) =>
+          a + balance(o),
         0
       )
     );
+
 
   $("mOverdue").textContent =
     db.orders.filter(
       isOverdue
     ).length;
 
+
   const rows =
     db.orders
       .slice()
       .sort(
         (a,b) =>
-          (b.created||"")
-            .localeCompare(
-              a.created||""
-            )
+          (b.created || "")
+          .localeCompare(
+            a.created || ""
+          )
       )
       .slice(0,8);
 
+
   $("recentOrders").innerHTML =
-    rows.map(o=>`
-      <tr>
-        <td>
-          <b>${esc(o.number)}</b>
-        </td>
+    rows.map(
+      o => `
+        <tr>
 
-        <td>
-          ${esc(
-            customer(o.customerId)?.name ||
-            "Unknown"
-          )}
-        </td>
+          <td>
+            <b>${esc(o.number)}</b>
+          </td>
 
-        <td>
-          ${esc(o.outfit)}
-        </td>
+          <td>
+            ${esc(
+              customer(
+                o.customerId
+              )?.name ||
+              "Unknown"
+            )}
+          </td>
 
-        <td>
-          ${collectionLabel(o)}
-        </td>
+          <td>
+            ${esc(o.outfit)}
+          </td>
 
-        <td>
-          ${statusBadge(o.status)}
-        </td>
+          <td>
+            ${collectionLabel(o)}
+          </td>
 
-        <td>
-          ${money(balance(o))}
-        </td>
-      </tr>
-    `).join("")
+          <td>
+            ${statusBadge(o.status)}
+          </td>
+
+          <td>
+            ${money(balance(o))}
+          </td>
+
+        </tr>
+      `
+    ).join("")
+
     ||
+
     `
       <tr>
         <td colspan="6" class="empty">
@@ -366,47 +961,66 @@ function renderDashboard(){
         </td>
       </tr>
     `;
+
 }
+
+
+/* =====================================================
+   CUSTOMERS
+   ===================================================== */
 
 function renderCustomers(){
 
   const q =
-    ($("customerSearch")?.value || "")
-      .toLowerCase();
+    (
+      $("customerSearch")
+        ?.value ||
+      ""
+    ).toLowerCase();
+
 
   const rows =
     db.customers.filter(
       c =>
-        (`${c.name} ${c.phone}`)
+        `${c.name} ${c.phone}`
           .toLowerCase()
           .includes(q)
     );
 
+
   $("customerRows").innerHTML =
-    rows.map(c=>{
+    rows.map(c => {
 
       const ms =
         db.measurements
           .filter(
-            m => m.customerId === c.id
+            m =>
+              m.customerId === c.id
           )
           .sort(
             (a,b) =>
-              (b.date||"")
-                .localeCompare(
-                  a.date||""
-                )
+              (b.date || "")
+              .localeCompare(
+                a.date || ""
+              )
           )[0];
+
 
       return `
         <tr>
 
           <td>
-            <b>${esc(c.name)}</b>
+
+            <b>
+              ${esc(c.name)}
+            </b>
+
             <br>
+
             <span class="muted">
               ${esc(c.id)}
             </span>
+
           </td>
 
           <td>
@@ -416,7 +1030,8 @@ function renderCustomers(){
           <td>
             ${
               db.orders.filter(
-                o => o.customerId === c.id
+                o =>
+                  o.customerId === c.id
               ).length
             }
           </td>
@@ -429,13 +1044,15 @@ function renderCustomers(){
 
             <button
               class="btn secondary"
-              onclick="openCustomer('${esc(c.id)}')">
+              onclick="openCustomer('${esc(c.id)}')"
+            >
               View/Edit
             </button>
 
             <button
               class="btn secondary"
-              onclick="customerProfile('${esc(c.id)}')">
+              onclick="customerProfile('${esc(c.id)}')"
+            >
               Profile
             </button>
 
@@ -445,7 +1062,9 @@ function renderCustomers(){
       `;
 
     }).join("")
+
     ||
+
     `
       <tr>
         <td colspan="5" class="empty">
@@ -453,34 +1072,56 @@ function renderCustomers(){
         </td>
       </tr>
     `;
+
 }
+
+
+/* =====================================================
+   CUSTOMER SELECTS
+   ===================================================== */
 
 function fillCustomerSelects(){
 
   const opts =
-    `<option value="">
-      Select customer
-    </option>` +
-
-    db.customers.map(c=>`
-      <option value="${esc(c.id)}">
-        ${esc(c.name)} —
-        ${esc(c.phone)}
+    `
+      <option value="">
+        Select customer
       </option>
-    `).join("");
+    ` +
+
+    db.customers
+      .map(
+        c =>
+          `
+            <option value="${esc(c.id)}">
+              ${esc(c.name)}
+              —
+              ${esc(c.phone)}
+            </option>
+          `
+      )
+      .join("");
+
 
   if($("measurementCustomer")){
 
     const old =
       $("measurementCustomer").value;
 
-    $("measurementCustomer").innerHTML =
-      opts;
+    $("measurementCustomer")
+      .innerHTML = opts;
 
-    $("measurementCustomer").value =
-      old;
+    $("measurementCustomer")
+      .value = old;
+
   }
+
 }
+
+
+/* =====================================================
+   MEASUREMENTS
+   ===================================================== */
 
 function renderMeasurements(){
 
@@ -488,46 +1129,75 @@ function renderMeasurements(){
     $("measurementCustomer")
       ?.value || "";
 
+
   const rows =
     db.measurements
       .filter(
-        m => !id ||
-        m.customerId === id
+        m =>
+          !id ||
+          m.customerId === id
       )
       .sort(
         (a,b) =>
-          (b.date||"")
-            .localeCompare(
-              a.date||""
-            )
+          (b.date || "")
+          .localeCompare(
+            a.date || ""
+          )
       );
+
 
   if($("measurementRows")){
 
-    $("measurementRows").innerHTML =
-      rows.map(m=>`
-        <tr>
+    $("measurementRows")
+      .innerHTML =
 
-          <td>
-            ${esc(
-              customer(
-                m.customerId
-              )?.name ||
-              "Unknown"
-            )}
-          </td>
+      rows.map(
+        m => `
+          <tr>
 
-          <td>${esc(m.shoulder)}</td>
-          <td>${esc(m.chest)}</td>
-          <td>${esc(m.waist)}</td>
-          <td>${esc(m.hip)}</td>
-          <td>${esc(m.sleeve)}</td>
-          <td>${esc(m.length)}</td>
-          <td>${esc(m.date)}</td>
+            <td>
+              ${esc(
+                customer(
+                  m.customerId
+                )?.name ||
+                "Unknown"
+              )}
+            </td>
 
-        </tr>
-      `).join("")
+            <td>
+              ${esc(m.shoulder)}
+            </td>
+
+            <td>
+              ${esc(m.chest)}
+            </td>
+
+            <td>
+              ${esc(m.waist)}
+            </td>
+
+            <td>
+              ${esc(m.hip)}
+            </td>
+
+            <td>
+              ${esc(m.sleeve)}
+            </td>
+
+            <td>
+              ${esc(m.length)}
+            </td>
+
+            <td>
+              ${esc(m.date)}
+            </td>
+
+          </tr>
+        `
+      ).join("")
+
       ||
+
       `
         <tr>
           <td colspan="8" class="empty">
@@ -535,11 +1205,14 @@ function renderMeasurements(){
           </td>
         </tr>
       `;
+
   }
+
 }
 
+
 /* =====================================================
-   CUSTOMER + MEASUREMENTS INTEGRATION
+   CUSTOMER MEASUREMENT INTEGRATION
    ===================================================== */
 
 function getCustomerMeasurements(
@@ -548,35 +1221,42 @@ function getCustomerMeasurements(
 
   return db.measurements
     .filter(
-      m => m.customerId === customerId
+      m =>
+        m.customerId === customerId
     )
     .sort(
       (a,b) =>
-        (b.date||"")
-          .localeCompare(
-            a.date||""
-          )
+        (b.date || "")
+        .localeCompare(
+          a.date || ""
+        )
     );
+
 }
+
 
 function measurementOptionLabel(m){
 
   const parts = [];
+
 
   if(m.chest)
     parts.push(
       `Chest ${m.chest}`
     );
 
+
   if(m.waist)
     parts.push(
       `Waist ${m.waist}`
     );
 
+
   if(m.length)
     parts.push(
       `Length ${m.length}`
     );
+
 
   return `
     ${m.date || "Undated"}
@@ -586,7 +1266,9 @@ function measurementOptionLabel(m){
         : ""
     }
   `;
+
 }
+
 
 function measurementPreviewHTML(m){
 
@@ -597,24 +1279,41 @@ function measurementPreviewHTML(m){
         No measurement record selected.
       </div>
     `;
+
   }
+
 
   const fields = [
 
     ["Shoulder",m.shoulder],
+
     ["Chest",m.chest],
+
     ["Waist",m.waist],
+
     ["Hip",m.hip],
+
     ["Sleeve",m.sleeve],
+
     ["Length",m.length],
+
     ["Neck",m.neck],
-    ["Trouser Length",m.trouserLength],
+
+    [
+      "Trouser Length",
+      m.trouserLength
+    ],
+
     ["Thigh",m.thigh],
+
     ["Knee",m.knee],
+
     ["Wrist",m.wrist],
+
     ["Inseam",m.inseam]
 
   ];
+
 
   const values =
     fields.filter(
@@ -622,6 +1321,7 @@ function measurementPreviewHTML(m){
         x[1] !== undefined &&
         x[1] !== ""
     );
+
 
   return `
 
@@ -632,30 +1332,35 @@ function measurementPreviewHTML(m){
       </strong>
 
       <span>
-        ${esc(m.date || "Undated")}
+        ${esc(
+          m.date || "Undated"
+        )}
       </span>
 
     </div>
 
+
     <div class="measurement-preview-grid">
 
       ${
-        values.map(x=>`
+        values.map(
+          x => `
+            <div>
 
-          <div>
+              <span>
+                ${x[0]}
+              </span>
 
-            <span>
-              ${x[0]}
-            </span>
+              <b>
+                ${esc(x[1])}
+              </b>
 
-            <b>
-              ${esc(x[1])}
-            </b>
+            </div>
+          `
+        ).join("")
 
-          </div>
-
-        `).join("")
         ||
+
         `
           <div class="measurement-empty">
             This record has no values.
@@ -664,8 +1369,11 @@ function measurementPreviewHTML(m){
       }
 
     </div>
+
   `;
+
 }
+
 
 function updateOrderMeasurementOptions(){
 
@@ -676,50 +1384,67 @@ function updateOrderMeasurementOptions(){
     $("fo_measurement_preview");
 
   const customerId =
-    $("fo_customer")?.value;
+    $("fo_customer")
+      ?.value;
+
 
   if(!select || !preview)
     return;
+
 
   const measurements =
     getCustomerMeasurements(
       customerId
     );
 
+
   const current =
     select.dataset.current ||
     select.value ||
     "";
 
+
   select.innerHTML =
+
     `
       <option value="">
         No measurement selected
       </option>
     ` +
 
-    measurements.map(m=>`
-      <option value="${esc(m.id)}">
-        ${esc(
-          measurementOptionLabel(m)
-        )}
-      </option>
-    `).join("");
+    measurements
+      .map(
+        m =>
+          `
+            <option value="${esc(m.id)}">
+              ${esc(
+                measurementOptionLabel(m)
+              )}
+            </option>
+          `
+      )
+      .join("");
+
 
   const chosen =
     measurements.find(
-      m => m.id === current
+      m =>
+        m.id === current
     ) ||
     measurements[0];
 
+
   select.value =
     chosen?.id || "";
+
 
   preview.innerHTML =
     measurementPreviewHTML(
       chosen
     );
+
 }
+
 
 function updateOrderMeasurementPreview(){
 
@@ -729,21 +1454,29 @@ function updateOrderMeasurementPreview(){
   const preview =
     $("fo_measurement_preview");
 
+
   if(!select || !preview)
     return;
+
 
   preview.innerHTML =
     measurementPreviewHTML(
       db.measurements.find(
-        m => m.id === select.value
+        m =>
+          m.id ===
+          select.value
       )
     );
+
 }
+
 
 function openMeasurementForCustomerFromOrder(){
 
   const customerId =
-    $("fo_customer")?.value || "";
+    $("fo_customer")
+      ?.value || "";
+
 
   if(!customerId){
 
@@ -754,10 +1487,13 @@ function openMeasurementForCustomerFromOrder(){
     return;
   }
 
+
   openMeasurement(
     customerId
   );
+
 }
+
 
 /* =====================================================
    ORDERS
@@ -766,368 +1502,441 @@ function openMeasurementForCustomerFromOrder(){
 function renderOrders(){
 
   const q =
-    ($("orderSearch")?.value || "")
-      .toLowerCase()
-      .trim();
+    (
+      $("orderSearch")
+        ?.value || ""
+    )
+    .toLowerCase()
+    .trim();
+
 
   const f =
     $("orderStatusFilter")
       ?.value || "";
 
+
   const p =
     $("orderPriorityFilter")
       ?.value || "";
+
 
   const due =
     $("orderDueFilter")
       ?.value || "";
 
+
   const rows =
-    db.orders
-      .filter(o=>{
+    db.orders.filter(o => {
 
-        const text =
-          `
-            ${o.number}
-            ${customer(o.customerId)?.name || ""}
-            ${o.outfit || ""}
-            ${o.phone || ""}
-          `.toLowerCase();
+      const text =
+        `
+          ${o.number}
+          ${customer(o.customerId)?.name || ""}
+          ${o.outfit || ""}
+          ${o.phone || ""}
+        `
+        .toLowerCase();
 
-        if(q && !text.includes(q))
-          return false;
 
-        if(f && o.status !== f)
-          return false;
+      if(q && !text.includes(q))
+        return false;
 
-        if(p && o.priority !== p)
-          return false;
 
-        if(
-          due === "overdue" &&
-          !isOverdue(o)
+      if(f && o.status !== f)
+        return false;
+
+
+      if(p && o.priority !== p)
+        return false;
+
+
+      if(
+        due === "overdue" &&
+        !isOverdue(o)
+      )
+        return false;
+
+
+      if(
+        due === "today" &&
+        (
+          o.collectionDate !== today() ||
+          o.status === "Delivered"
         )
-          return false;
+      )
+        return false;
 
-        if(
-          due === "today" &&
-          (
-            o.collectionDate !== today() ||
-            o.status === "Delivered"
-          )
+
+      if(
+        due === "upcoming" &&
+        (
+          !o.collectionDate ||
+          o.collectionDate < today() ||
+          o.status === "Delivered"
         )
-          return false;
+      )
+        return false;
 
-        if(
-          due === "upcoming" &&
-          (
-            !o.collectionDate ||
-            o.collectionDate < today() ||
-            o.status === "Delivered"
-          )
-        )
-          return false;
 
-        return true;
+      return true;
 
-      })
-      .sort((a,b)=>{
+    })
+
+
+    .sort(
+      (a,b) => {
 
         if(
           isOverdue(a) !==
           isOverdue(b)
-        )
+        ){
+
           return isOverdue(a)
             ? -1
             : 1;
+
+        }
+
 
         return (
           b.created || ""
         ).localeCompare(
           a.created || ""
         );
-      });
+
+      }
+    );
+
 
   $("orderCount").textContent =
+
     `${rows.length} order${
       rows.length === 1
         ? ""
         : "s"
     }`;
 
+
   $("orderRows").innerHTML =
-    rows.map(o=>`
 
-      <tr
-        class="${
-          isOverdue(o)
-            ? "row-overdue"
-            : ""
-        }">
+    rows.map(
+      o => `
 
-        <td>
+        <tr
+          class="${
+            isOverdue(o)
+              ? "row-overdue"
+              : ""
+          }"
+        >
 
-          <b>
-            ${esc(o.number)}
-          </b>
+          <td>
 
-          <br>
+            <b>
+              ${esc(o.number)}
+            </b>
 
-          ${priorityBadge(
-            o.priority
-          )}
+            <br>
 
-        </td>
-
-        <td>
-
-          <b>
-            ${esc(
-              customer(
-                o.customerId
-              )?.name ||
-              "Unknown"
+            ${priorityBadge(
+              o.priority
             )}
-          </b>
 
-          <br>
+          </td>
 
-          <small>
+
+          <td>
+
+            <b>
+              ${esc(
+                customer(
+                  o.customerId
+                )?.name ||
+                "Unknown"
+              )}
+            </b>
+
+            <br>
+
+            <small>
+              ${esc(
+                customer(
+                  o.customerId
+                )?.phone ||
+                ""
+              )}
+            </small>
+
+          </td>
+
+
+          <td>
+
+            ${esc(o.outfit)}
+
+            <br>
+
+            <small>
+              Qty: ${esc(o.quantity)}
+            </small>
+
+          </td>
+
+
+          <td>
             ${esc(
-              customer(
-                o.customerId
-              )?.phone || ""
+              o.receivedDate ||
+              "—"
             )}
-          </small>
+          </td>
 
-        </td>
 
-        <td>
+          <td>
+            ${collectionLabel(o)}
+          </td>
 
-          ${esc(o.outfit)}
 
-          <br>
+          <td>
 
-          <small>
-            Qty: ${esc(o.quantity)}
-          </small>
+            <div>
+              ${statusBadge(
+                o.status
+              )}
+            </div>
 
-        </td>
 
-        <td>
-          ${esc(
-            o.receivedDate || "—"
-          )}
-        </td>
+            <select
+              class="inline-status"
+              onchange="setStatus('${esc(o.id)}',this.value)"
+            >
 
-        <td>
-          ${collectionLabel(o)}
-        </td>
+              ${
+                STATUSES.map(
+                  s =>
+                    `
+                      <option
+                        value="${esc(s)}"
+                        ${
+                          s === o.status
+                            ? "selected"
+                            : ""
+                        }
+                      >
+                        ${esc(s)}
+                      </option>
+                    `
+                ).join("")
+              }
 
-        <td>
+            </select>
 
-          <div>
-            ${statusBadge(o.status)}
-          </div>
+          </td>
 
-          <select
-            class="inline-status"
-            onchange="
-              setStatus(
-                '${esc(o.id)}',
-                this.value
-              )
-            ">
 
-            ${
-              STATUSES.map(s=>`
+          <td>
+            ${money(o.total)}
+          </td>
 
-                <option
-                  value="${esc(s)}"
-                  ${
-                    s === o.status
-                      ? "selected"
-                      : ""
-                  }>
 
-                  ${esc(s)}
+          <td>
+            <b>
+              ${money(balance(o))}
+            </b>
+          </td>
 
-                </option>
 
-              `).join("")
-            }
+          <td class="order-actions">
 
-          </select>
+            <button
+              class="btn secondary"
+              onclick="viewOrder('${esc(o.id)}')"
+            >
+              View
+            </button>
 
-        </td>
 
-        <td>
-          ${money(o.total)}
-        </td>
+            <button
+              class="btn secondary"
+              onclick="editOrder('${esc(o.id)}')"
+            >
+              Edit
+            </button>
 
-        <td>
-          <b>
-            ${money(balance(o))}
-          </b>
-        </td>
 
-        <td class="order-actions">
+            <button
+              class="btn secondary"
+              onclick="openPayment('${esc(o.id)}')"
+            >
+              Pay
+            </button>
 
-          <button
-            class="btn secondary"
-            onclick="
-              viewOrder(
-                '${esc(o.id)}'
-              )
-            ">
-            View
-          </button>
 
-          <button
-            class="btn secondary"
-            onclick="
-              editOrder(
-                '${esc(o.id)}'
-              )
-            ">
-            Edit
-          </button>
+            <button
+              class="btn secondary"
+              onclick="printReceipt('${esc(o.id)}')"
+            >
+              Receipt
+            </button>
 
-          <button
-            class="btn secondary"
-            onclick="
-              openPayment(
-                '${esc(o.id)}'
-              )
-            ">
-            Pay
-          </button>
+          </td>
 
-          <button
-            class="btn secondary"
-            onclick="
-              printReceipt(
-                '${esc(o.id)}'
-              )
-            ">
-            Receipt
-          </button>
+        </tr>
 
-        </td>
+      `
+    ).join("")
 
-      </tr>
-
-    `).join("")
     ||
+
     `
       <tr>
-        <td colspan="9" class="empty">
+
+        <td
+          colspan="9"
+          class="empty"
+        >
           No orders match your filters.
         </td>
+
       </tr>
     `;
+
 }
+
+
+/* =====================================================
+   PAYMENTS
+   ===================================================== */
 
 function renderPayments(){
 
   if(!$("paymentRows"))
     return;
 
+
   $("paymentRows").innerHTML =
+
     db.payments
       .slice()
       .sort(
         (a,b) =>
-          (b.date||"")
-            .localeCompare(
-              a.date||""
-            )
+          (b.date || "")
+          .localeCompare(
+            a.date || ""
+          )
       )
-      .map(p=>`
 
-        <tr>
+      .map(
+        p => `
 
-          <td>
-            ${esc(p.date)}
-          </td>
+          <tr>
 
-          <td>
-            ${esc(
-              order(
-                p.orderId
-              )?.number || "—"
-            )}
-          </td>
+            <td>
+              ${esc(p.date)}
+            </td>
 
-          <td>
-            ${esc(
-              customer(
+            <td>
+              ${esc(
                 order(
                   p.orderId
-                )?.customerId
-              )?.name ||
-              "Unknown"
-            )}
-          </td>
+                )?.number ||
+                "—"
+              )}
+            </td>
 
-          <td>
-            ${money(p.amount)}
-          </td>
+            <td>
+              ${esc(
+                customer(
+                  order(
+                    p.orderId
+                  )?.customerId
+                )?.name ||
+                "Unknown"
+              )}
+            </td>
 
-          <td>
-            ${esc(
-              p.method || "—"
-            )}
-          </td>
+            <td>
+              ${money(p.amount)}
+            </td>
 
-        </tr>
+            <td>
+              ${esc(
+                p.method ||
+                "—"
+              )}
+            </td>
 
-      `).join("")
-      ||
-      `
-        <tr>
-          <td colspan="5" class="empty">
-            No payments recorded.
-          </td>
-        </tr>
-      `;
+          </tr>
+
+        `
+      ).join("")
+
+    ||
+
+    `
+      <tr>
+
+        <td
+          colspan="5"
+          class="empty"
+        >
+          No payments recorded.
+        </td>
+
+      </tr>
+    `;
+
 }
+
+
+/* =====================================================
+   REPORTS
+   ===================================================== */
 
 function renderReports(){
 
   if(!$("rRevenue"))
     return;
 
+
   $("rRevenue").textContent =
     money(
       db.payments.reduce(
         (a,p) =>
-          a + Number(
+          a +
+          Number(
             p.amount || 0
           ),
         0
       )
     );
 
+
   $("rOrders").textContent =
     db.orders.length;
 
+
   $("rDelivered").textContent =
     db.orders.filter(
-      o => o.status === "Delivered"
+      o =>
+        o.status ===
+        "Delivered"
     ).length;
+
 
   $("rUnpaid").textContent =
     db.orders.filter(
-      o => balance(o) > 0
+      o =>
+        balance(o) > 0
     ).length;
+
 }
 
+
 /* =====================================================
-   CUSTOMERS
+   CUSTOMER FORM
    ===================================================== */
 
-function openCustomer(id=""){
+function openCustomer(id = ""){
 
   const c =
     customer(id) ||
@@ -1138,10 +1947,12 @@ function openCustomer(id=""){
       notes:""
     };
 
+
   $("modalTitle").textContent =
     id
       ? "Edit Customer"
       : "New Customer";
+
 
   $("modalBody").innerHTML = `
 
@@ -1149,7 +1960,8 @@ function openCustomer(id=""){
       onsubmit="
         event.preventDefault();
         saveCustomer('${esc(id)}')
-      ">
+      "
+    >
 
       <div class="formgrid">
 
@@ -1167,6 +1979,7 @@ function openCustomer(id=""){
 
         </div>
 
+
         <div class="field">
 
           <label>
@@ -1181,6 +1994,7 @@ function openCustomer(id=""){
 
         </div>
 
+
         <div class="field full">
 
           <label>
@@ -1193,6 +2007,7 @@ function openCustomer(id=""){
           >
 
         </div>
+
 
         <div class="field full">
 
@@ -1208,28 +2023,37 @@ function openCustomer(id=""){
 
       </div>
 
+
       <div class="actions">
 
         <button
           type="button"
           class="btn secondary"
-          onclick="closeModal()">
+          onclick="closeModal()"
+        >
           Cancel
         </button>
 
-        <button class="btn">
+
+        <button
+          class="btn"
+        >
           Save Customer
         </button>
 
       </div>
 
     </form>
+
   `;
 
-  $("modal").classList.remove(
-    "hidden"
-  );
+
+  $("modal")
+    .classList
+    .remove("hidden");
+
 }
+
 
 function saveCustomer(id){
 
@@ -1261,14 +2085,18 @@ function saveCustomer(id){
       $("f_notes")
         .value
         .trim()
+
   };
+
 
   if(id){
 
     const i =
       db.customers.findIndex(
-        x => x.id === id
+        x =>
+          x.id === id
       );
+
 
     if(i >= 0)
       db.customers[i] = c;
@@ -1279,16 +2107,20 @@ function saveCustomer(id){
 
   }
 
+
   closeModal();
+
   save();
+
 }
 
+
 /* =====================================================
-   MEASUREMENTS
+   MEASUREMENT FORM
    ===================================================== */
 
 function openMeasurement(
-  preselectedCustomer=""
+  preselectedCustomer = ""
 ){
 
   if(!db.customers.length){
@@ -1300,8 +2132,10 @@ function openMeasurement(
     return;
   }
 
+
   $("modalTitle").textContent =
     "Add Measurement";
+
 
   $("modalBody").innerHTML = `
 
@@ -1309,7 +2143,8 @@ function openMeasurement(
       onsubmit="
         event.preventDefault();
         saveMeasurement()
-      ">
+      "
+    >
 
       <div class="formgrid">
 
@@ -1321,30 +2156,32 @@ function openMeasurement(
 
           <select
             id="fm_customer"
-            required>
+            required
+          >
 
             ${
-              db.customers.map(c=>`
-
-                <option
-                  value="${esc(c.id)}"
-                  ${
-                    c.id ===
-                    preselectedCustomer
-                      ? "selected"
-                      : ""
-                  }>
-
-                  ${esc(c.name)}
-
-                </option>
-
-              `).join("")
+              db.customers.map(
+                c =>
+                  `
+                    <option
+                      value="${esc(c.id)}"
+                      ${
+                        c.id ===
+                        preselectedCustomer
+                          ? "selected"
+                          : ""
+                      }
+                    >
+                      ${esc(c.name)}
+                    </option>
+                  `
+              ).join("")
             }
 
           </select>
 
         </div>
+
 
         <div class="field">
 
@@ -1360,6 +2197,7 @@ function openMeasurement(
 
         </div>
 
+
         ${
           [
             "shoulder",
@@ -1374,65 +2212,80 @@ function openMeasurement(
             "knee",
             "wrist",
             "inseam"
-          ].map(x=>`
+          ]
 
-            <div class="field">
+          .map(
+            x => `
 
-              <label>
+              <div class="field">
 
-                ${
-                  x
-                    .replace(
-                      /([A-Z])/g,
-                      " $1"
-                    )
-                    .replace(
-                      /^./,
-                      s =>
-                        s.toUpperCase()
-                    )
-                }
+                <label>
 
-              </label>
+                  ${
+                    x
+                      .replace(
+                        /([A-Z])/g,
+                        " $1"
+                      )
+                      .replace(
+                        /^./,
+                        s =>
+                          s.toUpperCase()
+                      )
+                  }
 
-              <input
-                id="fm_${x}"
-                placeholder="e.g. 18"
-              >
+                </label>
 
-            </div>
+                <input
+                  id="fm_${x}"
+                  placeholder="e.g. 18"
+                >
 
-          `).join("")
+              </div>
+
+            `
+          )
+          .join("")
         }
 
       </div>
+
 
       <div class="actions">
 
         <button
           type="button"
           class="btn secondary"
-          onclick="closeModal()">
+          onclick="closeModal()"
+        >
           Cancel
         </button>
 
-        <button class="btn">
+
+        <button
+          class="btn"
+        >
           Save Measurement
         </button>
 
       </div>
 
     </form>
+
   `;
 
-  $("modal").classList.remove(
-    "hidden"
-  );
+
+  $("modal")
+    .classList
+    .remove("hidden");
+
 }
+
 
 function saveMeasurement(){
 
   const fields = [
+
     "shoulder",
     "chest",
     "waist",
@@ -1445,7 +2298,9 @@ function saveMeasurement(){
     "knee",
     "wrist",
     "inseam"
+
   ];
+
 
   const m = {
 
@@ -1453,41 +2308,52 @@ function saveMeasurement(){
       generateId("MS"),
 
     customerId:
-      $("fm_customer").value,
+      $("fm_customer")
+        .value,
 
     date:
-      $("fm_date").value ||
+      $("fm_date")
+        .value ||
       today()
 
   };
 
+
   fields.forEach(
     x =>
       m[x] =
-        $("fm_"+x)
+        $("fm_" + x)
           .value
           .trim()
   );
 
+
   db.measurements.push(m);
 
   closeModal();
+
   save();
+
 }
+
 
 /* =====================================================
    ORDER FORM
    ===================================================== */
 
-function orderFormHTML(o={}){
+function orderFormHTML(
+  o = {}
+){
 
   const edit =
     !!o.id;
+
 
   const selectedCustomer =
     o.customerId ||
     db.customers[0]?.id ||
     "";
+
 
   return `
 
@@ -1499,7 +2365,8 @@ function orderFormHTML(o={}){
             ? `updateOrder('${esc(o.id)}')`
             : `saveOrder()`
         }
-      ">
+      "
+    >
 
       <div class="order-form-title">
 
@@ -1511,10 +2378,10 @@ function orderFormHTML(o={}){
 
       </div>
 
-      <div
-        class="formgrid order-form-grid">
 
-        <!-- CUSTOMER -->
+      <div
+        class="formgrid order-form-grid"
+      >
 
         <div class="field full">
 
@@ -1527,43 +2394,55 @@ function orderFormHTML(o={}){
             required
             onchange="
               updateOrderMeasurementOptions()
-            ">
+            "
+          >
 
             ${
-              db.customers.map(c=>`
+              db.customers.map(
+                c =>
+                  `
+                    <option
+                      value="${esc(c.id)}"
+                      ${
+                        c.id ===
+                        selectedCustomer
+                          ? "selected"
+                          : ""
+                      }
+                    >
 
-                <option
-                  value="${esc(c.id)}"
-                  ${
-                    c.id === selectedCustomer
-                      ? "selected"
-                      : ""
-                  }>
+                      ${esc(c.name)}
+                      —
+                      ${esc(c.phone)}
 
-                  ${esc(c.name)}
-                  —
-                  ${esc(c.phone)}
-
-                </option>
-
-              `).join("")
+                    </option>
+                  `
+              ).join("")
             }
 
           </select>
 
         </div>
 
-        <!-- MEASUREMENT -->
 
         <div
-          class="field full measurement-selector-block">
+          class="
+            field
+            full
+            measurement-selector-block
+          "
+        >
 
           <label>
             Measurement Record
           </label>
 
+
           <div
-            class="measurement-selector-row">
+            class="
+              measurement-selector-row
+            "
+          >
 
             <select
               id="fo_measurement"
@@ -1572,7 +2451,8 @@ function orderFormHTML(o={}){
               )}"
               onchange="
                 updateOrderMeasurementPreview()
-              ">
+              "
+            >
 
               <option value="">
                 No measurement selected
@@ -1580,30 +2460,29 @@ function orderFormHTML(o={}){
 
             </select>
 
+
             <button
               type="button"
               class="btn secondary"
               onclick="
                 openMeasurementForCustomerFromOrder()
-              ">
-
+              "
+            >
               + New Measurement
-
             </button>
 
           </div>
 
+
           <div
             id="fo_measurement_preview"
-            class="measurement-preview">
-
+            class="measurement-preview"
+          >
             No measurement record selected.
-
           </div>
 
         </div>
 
-        <!-- OUTFIT -->
 
         <div class="field">
 
@@ -1622,7 +2501,6 @@ function orderFormHTML(o={}){
 
         </div>
 
-        <!-- QUANTITY -->
 
         <div class="field">
 
@@ -1642,7 +2520,6 @@ function orderFormHTML(o={}){
 
         </div>
 
-        <!-- MATERIAL RECEIVED -->
 
         <div class="field">
 
@@ -1654,13 +2531,13 @@ function orderFormHTML(o={}){
             id="fo_received"
             type="date"
             value="${esc(
-              o.receivedDate || today()
+              o.receivedDate ||
+              today()
             )}"
           >
 
         </div>
 
-        <!-- COLLECTION -->
 
         <div class="field">
 
@@ -1679,7 +2556,6 @@ function orderFormHTML(o={}){
 
         </div>
 
-        <!-- PRIORITY -->
 
         <div class="field">
 
@@ -1687,32 +2563,33 @@ function orderFormHTML(o={}){
             Priority
           </label>
 
-          <select
-            id="fo_priority">
+          <select id="fo_priority">
 
             ${
-              PRIORITIES.map(p=>`
-
-                <option
-                  ${
-                    p ===
-                    (o.priority || "Normal")
-                      ? "selected"
-                      : ""
-                  }>
-
-                  ${p}
-
-                </option>
-
-              `).join("")
+              PRIORITIES.map(
+                p =>
+                  `
+                    <option
+                      ${
+                        p ===
+                        (
+                          o.priority ||
+                          "Normal"
+                        )
+                          ? "selected"
+                          : ""
+                      }
+                    >
+                      ${p}
+                    </option>
+                  `
+              ).join("")
             }
 
           </select>
 
         </div>
 
-        <!-- STATUS -->
 
         <div class="field">
 
@@ -1720,32 +2597,33 @@ function orderFormHTML(o={}){
             Order Status
           </label>
 
-          <select
-            id="fo_status">
+          <select id="fo_status">
 
             ${
-              STATUSES.map(s=>`
-
-                <option
-                  ${
-                    s ===
-                    (o.status || "Received")
-                      ? "selected"
-                      : ""
-                  }>
-
-                  ${s}
-
-                </option>
-
-              `).join("")
+              STATUSES.map(
+                s =>
+                  `
+                    <option
+                      ${
+                        s ===
+                        (
+                          o.status ||
+                          "Received"
+                        )
+                          ? "selected"
+                          : ""
+                      }
+                    >
+                      ${s}
+                    </option>
+                  `
+              ).join("")
             }
 
           </select>
 
         </div>
 
-        <!-- TOTAL -->
 
         <div class="field">
 
@@ -1766,7 +2644,6 @@ function orderFormHTML(o={}){
 
         </div>
 
-        <!-- PAYMENT -->
 
         <div class="field">
 
@@ -1786,7 +2663,6 @@ function orderFormHTML(o={}){
 
         </div>
 
-        <!-- FABRIC -->
 
         <div class="field">
 
@@ -1806,7 +2682,6 @@ function orderFormHTML(o={}){
 
         </div>
 
-        <!-- NOTES -->
 
         <div class="field full">
 
@@ -1828,16 +2703,21 @@ function orderFormHTML(o={}){
 
       </div>
 
+
       ${
         edit
           ? `
-            <div class="order-edit-warning">
+            <div
+              class="
+                order-edit-warning
+              "
+            >
 
               Changing the initial payment
               changes the recorded paid amount.
 
-              For additional payments, use
-              <b>Record Payment</b>
+              For additional payments,
+              use <b>Record Payment</b>
               from the Orders page.
 
             </div>
@@ -1845,16 +2725,17 @@ function orderFormHTML(o={}){
           : ""
       }
 
+
       <div class="actions">
 
         <button
           type="button"
           class="btn secondary"
-          onclick="closeModal()">
-
+          onclick="closeModal()"
+        >
           Cancel
-
         </button>
+
 
         <button class="btn">
 
@@ -1869,8 +2750,11 @@ function orderFormHTML(o={}){
       </div>
 
     </form>
+
   `;
+
 }
+
 
 function openOrder(){
 
@@ -1883,30 +2767,40 @@ function openOrder(){
     return;
   }
 
+
   $("modalTitle").textContent =
     "New Order";
+
 
   $("modalBody").innerHTML =
     orderFormHTML();
 
-  $("modal").classList.remove(
-    "hidden"
-  );
+
+  $("modal")
+    .classList
+    .remove("hidden");
+
 
   updateOrderMeasurementOptions();
+
 }
+
 
 function collectOrderForm(){
 
   const total =
     Number(
-      $("fo_total").value || 0
+      $("fo_total")
+        .value || 0
     );
+
 
   const paid =
     Number(
-      $("fo_paid").value || 0
+      $("fo_paid")
+        .value || 0
     );
+
 
   if(paid > total){
 
@@ -1917,14 +2811,16 @@ function collectOrderForm(){
     return null;
   }
 
+
   return {
 
     customerId:
-      $("fo_customer").value,
+      $("fo_customer")
+        .value,
 
     measurementId:
-      $("fo_measurement")?.value ||
-      "",
+      $("fo_measurement")
+        ?.value || "",
 
     outfit:
       $("fo_outfit")
@@ -1941,17 +2837,21 @@ function collectOrderForm(){
       ),
 
     receivedDate:
-      $("fo_received").value ||
+      $("fo_received")
+        .value ||
       today(),
 
     collectionDate:
-      $("fo_collection").value,
+      $("fo_collection")
+        .value,
 
     priority:
-      $("fo_priority").value,
+      $("fo_priority")
+        .value,
 
     status:
-      $("fo_status").value,
+      $("fo_status")
+        .value,
 
     total,
 
@@ -1966,29 +2866,42 @@ function collectOrderForm(){
       $("fo_notes")
         .value
         .trim()
+
   };
+
 }
+
+
+/* =====================================================
+   SAVE ORDER
+   ===================================================== */
 
 function saveOrder(){
 
   const data =
     collectOrderForm();
 
+
   if(
     !data ||
     !data.collectionDate
   ){
 
-    if(data)
+    if(data){
+
       alert(
         "Please select a collection date."
       );
 
+    }
+
     return;
   }
 
+
   const id =
     generateId("ORD");
+
 
   const o = {
 
@@ -1999,13 +2912,18 @@ function saveOrder(){
     ...data,
 
     created:
-      new Date().toISOString(),
+      new Date()
+        .toISOString(),
 
     updated:
-      new Date().toISOString()
+      new Date()
+        .toISOString()
+
   };
 
+
   db.orders.push(o);
+
 
   if(data.paid > 0){
 
@@ -2032,38 +2950,55 @@ function saveOrder(){
 
   }
 
+
   closeModal();
+
   save();
+
 }
+
+
+/* =====================================================
+   EDIT ORDER
+   ===================================================== */
 
 function editOrder(id){
 
   const o =
     order(id);
 
+
   if(!o)
     return;
+
 
   $("modalTitle").textContent =
     `Edit Order ${o.number}`;
 
+
   $("modalBody").innerHTML =
     orderFormHTML(o);
 
-  $("modal").classList.remove(
-    "hidden"
-  );
+
+  $("modal")
+    .classList
+    .remove("hidden");
+
 
   updateOrderMeasurementOptions();
+
 }
+
 
 function updateOrder(id){
 
   const o =
     order(id);
 
+
   const data =
     collectOrderForm();
+
 
   if(
     !o ||
@@ -2072,11 +3007,14 @@ function updateOrder(id){
   )
     return;
 
+
   const oldPaid =
     Number(o.paid || 0);
 
+
   const newPaid =
     data.paid;
+
 
   if(newPaid < oldPaid){
 
@@ -2084,11 +3022,14 @@ function updateOrder(id){
       "To reduce a customer's recorded payment, use the payment records rather than editing the order total paid amount."
     );
 
+
     $("fo_paid").value =
       oldPaid;
 
+
     return;
   }
+
 
   if(newPaid > oldPaid){
 
@@ -2115,37 +3056,58 @@ function updateOrder(id){
 
   }
 
+
   Object.assign(
     o,
     data,
     {
       updated:
-        new Date().toISOString()
+        new Date()
+          .toISOString()
     }
   );
 
+
   closeModal();
+
   save();
+
 }
 
-function setStatus(id,s){
+
+/* =====================================================
+   STATUS
+   ===================================================== */
+
+function setStatus(
+  id,
+  s
+){
 
   const o =
     order(id);
+
 
   if(
     o &&
     STATUSES.includes(s)
   ){
 
-    o.status = s;
+    o.status =
+      s;
+
 
     o.updated =
-      new Date().toISOString();
+      new Date()
+        .toISOString();
+
 
     save();
+
   }
+
 }
+
 
 /* =====================================================
    VIEW ORDER
@@ -2156,40 +3118,40 @@ function viewOrder(id){
   const o =
     order(id);
 
+
   const c =
     customer(
       o?.customerId
     );
 
+
   if(!o || !c)
     return;
+
 
   const payments =
     db.payments
       .filter(
-        p => p.orderId === id
+        p =>
+          p.orderId === id
       )
       .sort(
         (a,b) =>
-          (b.date||"")
-            .localeCompare(
-              a.date||""
-            )
+          (b.date || "")
+          .localeCompare(
+            a.date || ""
+          )
       );
 
-  const measurement =
-    db.measurements.find(
-      m =>
-        m.id ===
-        o.measurementId
-    );
 
   $("modalTitle").textContent =
     `Order ${o.number}`;
 
+
   $("modalBody").innerHTML = `
 
     <div class="order-detail">
+
 
       <div class="order-detail-head">
 
@@ -2207,6 +3169,7 @@ function viewOrder(id){
 
         </div>
 
+
         <div>
 
           ${priorityBadge(
@@ -2221,9 +3184,12 @@ function viewOrder(id){
 
       </div>
 
+
       <div class="order-detail-grid">
 
+
         <div>
+
           <span>
             Customer
           </span>
@@ -2231,9 +3197,12 @@ function viewOrder(id){
           <b>
             ${esc(c.name)}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Order Number
           </span>
@@ -2241,21 +3210,28 @@ function viewOrder(id){
           <b>
             ${esc(o.number)}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Material Received
           </span>
 
           <b>
             ${esc(
-              o.receivedDate || "—"
+              o.receivedDate ||
+              "—"
             )}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Collection Date
           </span>
@@ -2263,9 +3239,12 @@ function viewOrder(id){
           <b>
             ${collectionLabel(o)}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Quantity
           </span>
@@ -2273,38 +3252,48 @@ function viewOrder(id){
           <b>
             ${esc(o.quantity)}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Measurement Record
           </span>
 
           <b>
-            ${
-              measurement
-                ? esc(
-                    measurement.date ||
-                    "Undated"
-                  )
-                : "Not selected"
-            }
+            ${esc(
+              db.measurements.find(
+                m =>
+                  m.id ===
+                  o.measurementId
+              )?.date ||
+              "Not selected"
+            )}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Fabric / Colour
           </span>
 
           <b>
             ${esc(
-              o.fabric || "—"
+              o.fabric ||
+              "—"
             )}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Total Price
           </span>
@@ -2312,9 +3301,12 @@ function viewOrder(id){
           <b>
             ${money(o.total)}
           </b>
+
         </div>
 
+
         <div>
+
           <span>
             Paid
           </span>
@@ -2322,9 +3314,13 @@ function viewOrder(id){
           <b>
             ${money(o.paid)}
           </b>
+
         </div>
 
-        <div class="balance-box">
+
+        <div
+          class="balance-box"
+        >
 
           <span>
             Outstanding Balance
@@ -2338,25 +3334,9 @@ function viewOrder(id){
 
         </div>
 
+
       </div>
 
-      ${
-        measurement
-          ? `
-            <div class="detail-block">
-
-              <h4>
-                Measurements Used
-              </h4>
-
-              ${measurementPreviewHTML(
-                measurement
-              )}
-
-            </div>
-          `
-          : ""
-      }
 
       <div class="detail-block">
 
@@ -2373,63 +3353,89 @@ function viewOrder(id){
 
       </div>
 
+
       <div class="detail-block">
 
         <h4>
           Payment History
         </h4>
 
+
         ${
           payments.length
-            ? `
-              <div class="tablewrap">
 
-                <table class="table">
+            ? `
+
+              <div
+                class="tablewrap"
+              >
+
+                <table
+                  class="table compact"
+                >
 
                   <thead>
 
                     <tr>
-                      <th>Date</th>
-                      <th>Amount</th>
-                      <th>Method</th>
-                      <th>Note</th>
+
+                      <th>
+                        Date
+                      </th>
+
+                      <th>
+                        Amount
+                      </th>
+
+                      <th>
+                        Method
+                      </th>
+
+                      <th>
+                        Note
+                      </th>
+
                     </tr>
 
                   </thead>
 
+
                   <tbody>
 
                     ${
-                      payments.map(p=>`
+                      payments.map(
+                        p =>
+                          `
 
-                        <tr>
+                            <tr>
 
-                          <td>
-                            ${esc(p.date)}
-                          </td>
+                              <td>
+                                ${esc(p.date)}
+                              </td>
 
-                          <td>
-                            ${money(
-                              p.amount
-                            )}
-                          </td>
+                              <td>
+                                ${money(
+                                  p.amount
+                                )}
+                              </td>
 
-                          <td>
-                            ${esc(
-                              p.method ||
-                              "—"
-                            )}
-                          </td>
+                              <td>
+                                ${esc(
+                                  p.method ||
+                                  "—"
+                                )}
+                              </td>
 
-                          <td>
-                            ${esc(
-                              p.note || ""
-                            )}
-                          </td>
+                              <td>
+                                ${esc(
+                                  p.note ||
+                                  ""
+                                )}
+                              </td>
 
-                        </tr>
+                            </tr>
 
-                      `).join("")
+                          `
+                      ).join("")
                     }
 
                   </tbody>
@@ -2437,76 +3443,89 @@ function viewOrder(id){
                 </table>
 
               </div>
+
             `
+
             : `
+
               <p class="muted">
                 No payments recorded.
               </p>
+
             `
         }
 
       </div>
+
 
       <div class="actions">
 
         <button
           class="btn secondary"
           onclick="
-            editOrder(
-              '${esc(id)}'
-            )
-          ">
+            editOrder('${esc(id)}')
+          "
+        >
           Edit Order
         </button>
 
+
         <button
           class="btn secondary"
           onclick="
-            openPayment(
-              '${esc(id)}'
-            )
-          ">
+            openPayment('${esc(id)}')
+          "
+        >
           Record Payment
         </button>
 
+
         <button
           class="btn secondary"
           onclick="
-            printReceipt(
-              '${esc(id)}'
-            )
-          ">
+            printReceipt('${esc(id)}')
+          "
+        >
           Print Receipt
         </button>
 
+
         <button
           class="btn"
-          onclick="closeModal()">
+          onclick="closeModal()"
+        >
           Close
         </button>
 
       </div>
 
+
     </div>
+
   `;
 
-  $("modal").classList.remove(
-    "hidden"
-  );
+
+  $("modal")
+    .classList
+    .remove("hidden");
+
 }
 
+
 /* =====================================================
-   PAYMENTS
+   RECORD PAYMENT
    ===================================================== */
 
 function openPayment(
-  orderId=""
+  orderId = ""
 ){
 
   const candidates =
     db.orders.filter(
-      o => balance(o) > 0
+      o =>
+        balance(o) > 0
     );
+
 
   if(!candidates.length){
 
@@ -2517,8 +3536,10 @@ function openPayment(
     return;
   }
 
+
   $("modalTitle").textContent =
     "Record Payment";
+
 
   $("modalBody").innerHTML = `
 
@@ -2526,9 +3547,11 @@ function openPayment(
       onsubmit="
         event.preventDefault();
         savePayment()
-      ">
+      "
+    >
 
       <div class="formgrid">
+
 
         <div class="field full">
 
@@ -2536,44 +3559,49 @@ function openPayment(
             Order *
           </label>
 
+
           <select
             id="fp_order"
-            required>
+            required
+          >
 
             ${
-              candidates.map(o=>`
+              candidates.map(
+                o =>
+                  `
+                    <option
+                      value="${esc(o.id)}"
+                      ${
+                        o.id ===
+                        orderId
+                          ? "selected"
+                          : ""
+                      }
+                    >
 
-                <option
-                  value="${esc(o.id)}"
-                  ${
-                    o.id === orderId
-                      ? "selected"
-                      : ""
-                  }>
+                      ${esc(o.number)}
+                      —
+                      ${esc(
+                        customer(
+                          o.customerId
+                        )?.name ||
+                        "Unknown"
+                      )}
+                      —
+                      Balance
+                      ${money(
+                        balance(o)
+                      )}
 
-                  ${esc(o.number)}
-                  —
-                  ${esc(
-                    customer(
-                      o.customerId
-                    )?.name ||
-                    "Unknown"
-                  )}
-
-                  —
-                  Balance
-                  ${money(
-                    balance(o)
-                  )}
-
-                </option>
-
-              `).join("")
+                    </option>
+                  `
+              ).join("")
             }
 
           </select>
 
         </div>
+
 
         <div class="field">
 
@@ -2591,6 +3619,7 @@ function openPayment(
 
         </div>
 
+
         <div class="field">
 
           <label>
@@ -2604,6 +3633,7 @@ function openPayment(
           >
 
         </div>
+
 
         <div class="field">
 
@@ -2637,6 +3667,7 @@ function openPayment(
 
         </div>
 
+
         <div class="field full">
 
           <label>
@@ -2652,16 +3683,20 @@ function openPayment(
 
         </div>
 
+
       </div>
+
 
       <div class="actions">
 
         <button
           type="button"
           class="btn secondary"
-          onclick="closeModal()">
+          onclick="closeModal()"
+        >
           Cancel
         </button>
+
 
         <button class="btn">
           Save Payment
@@ -2670,27 +3705,36 @@ function openPayment(
       </div>
 
     </form>
+
   `;
 
-  $("modal").classList.remove(
-    "hidden"
-  );
+
+  $("modal")
+    .classList
+    .remove("hidden");
+
 }
+
 
 function savePayment(){
 
   const o =
     order(
-      $("fp_order").value
+      $("fp_order")
+        .value
     );
+
 
   const amount =
     Number(
-      $("fp_amount").value || 0
+      $("fp_amount")
+        .value || 0
     );
+
 
   if(!o || amount <= 0)
     return;
+
 
   if(
     amount >
@@ -2698,17 +3742,17 @@ function savePayment(){
   ){
 
     alert(
-      `Payment exceeds the current balance of ${money(
-        balance(o)
-      )}.`
+      `Payment exceeds the current balance of ${money(balance(o))}.`
     );
 
     return;
   }
 
+
   o.paid =
     Number(o.paid || 0) +
     amount;
+
 
   db.payments.push({
 
@@ -2721,11 +3765,13 @@ function savePayment(){
     amount,
 
     date:
-      $("fp_date").value ||
+      $("fp_date")
+        .value ||
       today(),
 
     method:
-      $("fp_method").value,
+      $("fp_method")
+        .value,
 
     note:
       $("fp_note")
@@ -2734,9 +3780,13 @@ function savePayment(){
 
   });
 
+
   closeModal();
+
   save();
+
 }
+
 
 /* =====================================================
    CUSTOMER PROFILE
@@ -2747,41 +3797,49 @@ function customerProfile(id){
   const c =
     customer(id);
 
+
   if(!c)
     return;
+
 
   const ms =
     db.measurements
       .filter(
-        m => m.customerId === id
+        m =>
+          m.customerId === id
       )
       .sort(
         (a,b) =>
-          (b.date||"")
-            .localeCompare(
-              a.date||""
-            )
+          (b.date || "")
+          .localeCompare(
+            a.date || ""
+          )
       );
+
 
   const os =
     db.orders
       .filter(
-        o => o.customerId === id
+        o =>
+          o.customerId === id
       )
       .sort(
         (a,b) =>
-          (b.created||"")
-            .localeCompare(
-              a.created||""
-            )
+          (b.created || "")
+          .localeCompare(
+            a.created || ""
+          )
       );
+
 
   $("modalTitle").textContent =
     `Customer Profile — ${c.name}`;
 
+
   $("modalBody").innerHTML = `
 
     <div class="profile">
+
 
       <div class="card">
 
@@ -2791,20 +3849,27 @@ function customerProfile(id){
 
         <p>
           <b>Phone:</b>
-          ${esc(c.phone || "—")}
+          ${esc(
+            c.phone || "—"
+          )}
         </p>
 
         <p>
           <b>Address:</b>
-          ${esc(c.address || "—")}
+          ${esc(
+            c.address || "—"
+          )}
         </p>
 
         <p>
           <b>Notes:</b>
-          ${esc(c.notes || "—")}
+          ${esc(
+            c.notes || "—"
+          )}
         </p>
 
       </div>
+
 
       <div class="card">
 
@@ -2816,30 +3881,30 @@ function customerProfile(id){
 
           ${
             ms.length
-              ? `Latest recorded: ${esc(
-                  ms[0].date
-                )}`
+              ? `
+                Latest recorded:
+                ${esc(ms[0].date)}
+              `
               : "No measurements yet."
           }
 
         </p>
+
 
         <button
           class="btn secondary"
           onclick="
             closeModal();
             nav('measurements');
-            $(
-              'measurementCustomer'
-            ).value='${esc(id)}';
+            $('measurementCustomer').value='${esc(id)}';
             renderMeasurements()
-          ">
-
+          "
+        >
           View Measurements
-
         </button>
 
       </div>
+
 
       <div class="card full">
 
@@ -2847,12 +3912,19 @@ function customerProfile(id){
           Order History
         </h3>
 
+
         ${
           os.length
-            ? `
-              <div class="tablewrap">
 
-                <table class="table">
+            ? `
+
+              <div
+                class="tablewrap"
+              >
+
+                <table
+                  class="table"
+                >
 
                   <tr>
 
@@ -2878,50 +3950,62 @@ function customerProfile(id){
 
                   </tr>
 
+
                   ${
-                    os.map(o=>`
+                    os.map(
+                      o =>
+                        `
 
-                      <tr>
+                          <tr>
 
-                        <td>
-                          ${esc(o.number)}
-                        </td>
+                            <td>
+                              ${esc(
+                                o.number
+                              )}
+                            </td>
 
-                        <td>
-                          ${esc(o.outfit)}
-                        </td>
+                            <td>
+                              ${esc(
+                                o.outfit
+                              )}
+                            </td>
 
-                        <td>
-                          ${esc(
-                            o.collectionDate
-                          )}
-                        </td>
+                            <td>
+                              ${esc(
+                                o.collectionDate
+                              )}
+                            </td>
 
-                        <td>
-                          ${statusBadge(
-                            o.status
-                          )}
-                        </td>
+                            <td>
+                              ${statusBadge(
+                                o.status
+                              )}
+                            </td>
 
-                        <td>
-                          ${money(
-                            balance(o)
-                          )}
-                        </td>
+                            <td>
+                              ${money(
+                                balance(o)
+                              )}
+                            </td>
 
-                      </tr>
+                          </tr>
 
-                    `).join("")
+                        `
+                    ).join("")
                   }
 
                 </table>
 
               </div>
+
             `
+
             : `
+
               <p class="muted">
                 No orders yet.
               </p>
+
             `
         }
 
@@ -2929,24 +4013,30 @@ function customerProfile(id){
 
     </div>
 
+
     <div class="actions">
 
       <button
         class="btn"
-        onclick="closeModal()">
+        onclick="closeModal()"
+      >
         Close
       </button>
 
     </div>
+
   `;
 
-  $("modal").classList.remove(
-    "hidden"
-  );
+
+  $("modal")
+    .classList
+    .remove("hidden");
+
 }
 
+
 /* =====================================================
-   BACKUP / RESTORE
+   BACKUP
    ===================================================== */
 
 function backupData(){
@@ -2960,11 +4050,14 @@ function backupData(){
       "Orders Edition 3.0",
 
     exportedAt:
-      new Date().toISOString(),
+      new Date()
+        .toISOString(),
 
-    data:db
+    data:
+      db
 
   };
+
 
   const blob =
     new Blob(
@@ -2981,16 +4074,25 @@ function backupData(){
       }
     );
 
+
   const a =
-    document.createElement("a");
+    document.createElement(
+      "a"
+    );
+
 
   a.href =
-    URL.createObjectURL(blob);
+    URL.createObjectURL(
+      blob
+    );
+
 
   a.download =
     `tailorpro-backup-${today()}.json`;
 
+
   a.click();
+
 
   setTimeout(
     () =>
@@ -2999,18 +4101,27 @@ function backupData(){
       ),
     1000
   );
+
 }
+
+
+/* =====================================================
+   RESTORE
+   ===================================================== */
 
 function restoreData(e){
 
   const file =
     e.target.files?.[0];
 
+
   if(!file)
     return;
 
+
   const reader =
     new FileReader();
+
 
   reader.onload = () => {
 
@@ -3021,6 +4132,7 @@ function restoreData(e){
           reader.result
         );
 
+
       if(
         !p.data ||
         !Array.isArray(
@@ -3029,8 +4141,12 @@ function restoreData(e){
         !Array.isArray(
           p.data.orders
         )
-      )
+      ){
+
         throw new Error();
+
+      }
+
 
       if(
         !confirm(
@@ -3039,13 +4155,18 @@ function restoreData(e){
       )
         return;
 
-      db = p.data;
+
+      db =
+        p.data;
+
 
       save();
+
 
       alert(
         "Backup restored successfully."
       );
+
 
     }catch(err){
 
@@ -3055,15 +4176,19 @@ function restoreData(e){
 
     }
 
+
+    e.target.value = "";
+
   };
+
 
   reader.readAsText(file);
 
-  e.target.value = "";
 }
 
+
 /* =====================================================
-   RECEIPT
+   PRINT RECEIPT
    ===================================================== */
 
 function printReceipt(id){
@@ -3071,26 +4196,31 @@ function printReceipt(id){
   const o =
     order(id);
 
+
   const c =
     customer(
       o?.customerId
     );
 
+
   if(!o || !c)
     return;
+
 
   const payments =
     db.payments
       .filter(
-        p => p.orderId === id
+        p =>
+          p.orderId === id
       )
       .sort(
         (a,b) =>
-          (a.date||"")
-            .localeCompare(
-              b.date||""
-            )
+          (a.date || "")
+          .localeCompare(
+            b.date || ""
+          )
       );
+
 
   const w =
     window.open(
@@ -3098,6 +4228,7 @@ function printReceipt(id){
       "_blank",
       "width=700,height=900"
     );
+
 
   if(!w){
 
@@ -3108,28 +4239,36 @@ function printReceipt(id){
     return;
   }
 
+
   const paymentRows =
-    payments.map(p=>`
+    payments
+      .map(
+        p =>
+          `
+            <tr>
 
-      <tr>
+              <td>
+                ${esc(p.date)}
+              </td>
 
-        <td>
-          ${esc(p.date)}
-        </td>
+              <td>
+                ${esc(
+                  p.method ||
+                  "—"
+                )}
+              </td>
 
-        <td>
-          ${esc(
-            p.method || "—"
-          )}
-        </td>
+              <td>
+                ${money(
+                  p.amount
+                )}
+              </td>
 
-        <td>
-          ${money(p.amount)}
-        </td>
+            </tr>
+          `
+      )
+      .join("");
 
-      </tr>
-
-    `).join("");
 
   w.document.write(`
 
@@ -3137,217 +4276,358 @@ function printReceipt(id){
 
     <html>
 
-    <head>
+      <head>
 
-      <title>
-        Receipt ${esc(o.number)}
-      </title>
+        <title>
+          Receipt ${esc(o.number)}
+        </title>
 
-      <style>
 
-        body{
-          font-family:Arial,sans-serif;
-          padding:35px;
-          color:#172033;
-          max-width:700px;
-          margin:auto
-        }
+        <style>
 
-        h1{
-          color:#123f72;
-          margin-bottom:4px
-        }
+          body{
+            font-family:
+              Arial,
+              sans-serif;
 
-        .gold{
-          color:#b58a1d
-        }
+            padding:
+              35px;
 
-        .line{
-          border-top:1px solid #ddd;
-          margin:18px 0
-        }
+            color:
+              #172033;
 
-        .row{
-          display:flex;
-          justify-content:space-between;
-          margin:9px 0;
-          gap:20px
-        }
+            max-width:
+              700px;
 
-        .balance{
-          font-size:22px;
-          color:#b58a1d;
-          font-weight:800
-        }
-
-        table{
-          width:100%;
-          border-collapse:collapse;
-          margin-top:10px
-        }
-
-        th,td{
-          text-align:left;
-          padding:8px;
-          border-bottom:1px solid #ddd
-        }
-
-        @media print{
-          button{
-            display:none
-          }
-        }
-
-      </style>
-
-    </head>
-
-    <body>
-
-      <h1>
-        TailorPro
-      </h1>
-
-      <div class="gold">
-        Tailoring Management System
-      </div>
-
-      <div class="line"></div>
-
-      <h2>
-        Order Receipt
-      </h2>
-
-      <div class="row">
-        <b>Order:</b>
-        <span>
-          ${esc(o.number)}
-        </span>
-      </div>
-
-      <div class="row">
-        <b>Customer:</b>
-        <span>
-          ${esc(c.name)}
-        </span>
-      </div>
-
-      <div class="row">
-        <b>Phone:</b>
-        <span>
-          ${esc(c.phone)}
-        </span>
-      </div>
-
-      <div class="row">
-        <b>Outfit:</b>
-        <span>
-          ${esc(o.outfit)}
-          ×
-          ${esc(o.quantity)}
-        </span>
-      </div>
-
-      <div class="row">
-        <b>Collection Date:</b>
-        <span>
-          ${esc(o.collectionDate)}
-        </span>
-      </div>
-
-      <div class="row">
-        <b>Status:</b>
-        <span>
-          ${esc(o.status)}
-        </span>
-      </div>
-
-      <div class="line"></div>
-
-      <div class="row">
-        <b>Total:</b>
-        <span>
-          ${money(o.total)}
-        </span>
-      </div>
-
-      <div class="row">
-        <b>Paid:</b>
-        <span>
-          ${money(o.paid)}
-        </span>
-      </div>
-
-      <div class="row balance">
-        <b>Balance:</b>
-        <span>
-          ${money(balance(o))}
-        </span>
-      </div>
-
-      <h3>
-        Payment History
-      </h3>
-
-      <table>
-
-        <thead>
-
-          <tr>
-
-            <th>
-              Date
-            </th>
-
-            <th>
-              Method
-            </th>
-
-            <th>
-              Amount
-            </th>
-
-          </tr>
-
-        </thead>
-
-        <tbody>
-
-          ${
-            paymentRows ||
-            `
-              <tr>
-                <td colspan="3">
-                  No payments recorded.
-                </td>
-              </tr>
-            `
+            margin:
+              auto;
           }
 
-        </tbody>
 
-      </table>
+          h1{
+            color:
+              #123f72;
 
-      <div class="line"></div>
+            margin-bottom:
+              4px;
+          }
 
-      <p>
-        ${esc(
-          o.notes ||
-          "Thank you for your patronage."
-        )}
-      </p>
 
-      <script>
-        window.onload=()=>window.print()
-      <\/script>
+          .gold{
+            color:
+              #b58a1d;
+          }
 
-    </body>
+
+          .line{
+            border-top:
+              1px solid #ddd;
+
+            margin:
+              18px 0;
+          }
+
+
+          .row{
+            display:
+              flex;
+
+            justify-content:
+              space-between;
+
+            margin:
+              9px 0;
+
+            gap:
+              20px;
+          }
+
+
+          .total{
+            font-size:
+              20px;
+
+            font-weight:
+              700;
+          }
+
+
+          .balance{
+            font-size:
+              22px;
+
+            color:
+              #b58a1d;
+
+            font-weight:
+              800;
+          }
+
+
+          table{
+            width:
+              100%;
+
+            border-collapse:
+              collapse;
+
+            margin-top:
+              10px;
+          }
+
+
+          th,
+          td{
+            text-align:
+              left;
+
+            padding:
+              8px;
+
+            border-bottom:
+              1px solid #ddd;
+          }
+
+
+          @media print{
+
+            button{
+              display:none;
+            }
+
+          }
+
+        </style>
+
+      </head>
+
+
+      <body>
+
+        <h1>
+          TailorPro
+        </h1>
+
+
+        <div class="gold">
+          Tailoring Management System
+        </div>
+
+
+        <div class="line"></div>
+
+
+        <h2>
+          Order Receipt
+        </h2>
+
+
+        <div class="row">
+
+          <b>
+            Order:
+          </b>
+
+          <span>
+            ${esc(o.number)}
+          </span>
+
+        </div>
+
+
+        <div class="row">
+
+          <b>
+            Customer:
+          </b>
+
+          <span>
+            ${esc(c.name)}
+          </span>
+
+        </div>
+
+
+        <div class="row">
+
+          <b>
+            Phone:
+          </b>
+
+          <span>
+            ${esc(c.phone)}
+          </span>
+
+        </div>
+
+
+        <div class="row">
+
+          <b>
+            Outfit:
+          </b>
+
+          <span>
+            ${esc(o.outfit)}
+            ×
+            ${esc(o.quantity)}
+          </span>
+
+        </div>
+
+
+        <div class="row">
+
+          <b>
+            Collection Date:
+          </b>
+
+          <span>
+            ${esc(
+              o.collectionDate
+            )}
+          </span>
+
+        </div>
+
+
+        <div class="row">
+
+          <b>
+            Status:
+          </b>
+
+          <span>
+            ${esc(o.status)}
+          </span>
+
+        </div>
+
+
+        <div class="line"></div>
+
+
+        <div class="row">
+
+          <b>
+            Total:
+          </b>
+
+          <span>
+            ${money(o.total)}
+          </span>
+
+        </div>
+
+
+        <div class="row">
+
+          <b>
+            Paid:
+          </b>
+
+          <span>
+            ${money(o.paid)}
+          </span>
+
+        </div>
+
+
+        <div class="row balance">
+
+          <b>
+            Balance:
+          </b>
+
+          <span>
+            ${money(
+              balance(o)
+            )}
+          </span>
+
+        </div>
+
+
+        <h3>
+          Payment History
+        </h3>
+
+
+        <table>
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Date
+              </th>
+
+              <th>
+                Method
+              </th>
+
+              <th>
+                Amount
+              </th>
+
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            ${
+              paymentRows ||
+
+              `
+                <tr>
+
+                  <td
+                    colspan="3"
+                  >
+                    No payments recorded.
+                  </td>
+
+                </tr>
+              `
+            }
+
+          </tbody>
+
+        </table>
+
+
+        <div class="line"></div>
+
+
+        <p>
+          ${esc(
+            o.notes ||
+            "Thank you for your patronage."
+          )}
+        </p>
+
+
+        <script>
+
+          window.onload =
+            () => window.print()
+
+        <\/script>
+
+      </body>
 
     </html>
+
   `);
 
+
   w.document.close();
+
 }
+
 
 /* =====================================================
    MODAL
@@ -3358,7 +4638,9 @@ function closeModal(){
   $("modal")
     .classList
     .add("hidden");
+
 }
+
 
 $("modal")?.addEventListener(
   "click",
@@ -3367,20 +4649,46 @@ $("modal")?.addEventListener(
     if(
       e.target ===
       $("modal")
-    )
+    ){
+
       closeModal();
+
+    }
 
   }
 );
+
 
 window.addEventListener(
   "keydown",
   e => {
 
-    if(e.key === "Escape")
+    if(
+      e.key === "Escape"
+    ){
+
       closeModal();
+
+    }
 
   }
 );
 
-refresh();
+
+/* =====================================================
+   START APPLICATION
+   ===================================================== */
+
+if(SESSION_USER){
+
+  hideAuth();
+
+  refresh();
+
+}else{
+
+  showAuth(
+    "login"
+  );
+
+}
