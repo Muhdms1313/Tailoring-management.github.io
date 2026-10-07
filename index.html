@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TailorPro Manager</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+<aside class="side"><div class="brand">TailorPro<small>Tailoring Management System</small></div><div class="nav">
+<button data-page="dashboard" class="active">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button>
+</div></aside>
+<div class="mobilebar"><button data-page="dashboard">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button></div>
+<main class="main">
+<div class="top"><div><h1 id="pageTitle">Dashboard</h1><div class="muted">Manage your tailoring business in one place.</div></div><button class="btn" onclick="openCustomer()">+ New Customer</button></div>
+
+<section id="dashboard" class="page active">
+<div class="grid">
+<div class="card"><div class="muted">Customers</div><div class="metric" id="mCustomers">0</div></div>
+<div class="card"><div class="muted">Active Orders</div><div class="metric" id="mActive">0</div></div>
+<div class="card"><div class="muted">Due Today</div><div class="metric" id="mDue">0</div></div>
+<div class="card"><div class="muted">Outstanding Balance</div><div class="metric" id="mBalance">₦0</div></div>
+</div>
+<div class="section"><div class="sectionhead"><h2>Recent Orders</h2><button class="btn secondary" onclick="openOrder()">+ New Order</button></div><div class="tablewrap"><table class="table"><thead><tr><th>Order</th><th>Customer</th><th>Outfit</th><th>Collection Date</th><th>Status</th><th>Balance</th></tr></thead><tbody id="recentOrders"></tbody></table></div></div>
+</section>
+
+<section id="customers" class="page">
+<div class="toolbar"><input id="customerSearch" class="search" placeholder="Search name or phone..." oninput="renderCustomers()"><button class="btn" onclick="openCustomer()">+ New Customer</button></div>
+<div class="section"><div class="tablewrap"><table class="table"><thead><tr><th>Customer</th><th>Phone</th><th>Orders</th><th>Latest Measurement</th><th>Actions</th></tr></thead><tbody id="customerRows"></tbody></table></div></div>
+</section>
+
+<section id="measurements" class="page">
+<div class="toolbar"><select id="measurementCustomer" onchange="renderMeasurements()"><option value="">Select customer</option></select><button class="btn" onclick="openMeasurement()">+ Add Measurement</button></div>
+<div class="section"><div class="tablewrap"><table class="table"><thead><tr><th>Customer</th><th>Shoulder</th><th>Chest</th><th>Waist</th><th>Hip</th><th>Sleeve</th><th>Length</th><th>Date</th></tr></thead><tbody id="measurementRows"></tbody></table></div></div>
+</section>
+
+<section id="orders" class="page">
+<div class="toolbar"><input id="orderSearch" class="search" placeholder="Search order or customer..." oninput="renderOrders()"><select id="orderStatusFilter" onchange="renderOrders()"><option value="">All statuses</option><option>Received</option><option>Cutting</option><option>Sewing</option><option>Finishing</option><option>Ready for Collection</option><option>Delivered</option></select><button class="btn" onclick="openOrder()">+ New Order</button></div>
+<div class="section"><div class="tablewrap"><table class="table"><thead><tr><th>Order #</th><th>Customer</th><th>Outfit</th><th>Received</th><th>Collection</th><th>Status</th><th>Total</th><th>Balance</th></tr></thead><tbody id="orderRows"></tbody></table></div></div>
+</section>
+
+<section id="payments" class="page">
+<div class="section"><div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Order</th><th>Customer</th><th>Amount</th><th>Method</th></tr></thead><tbody id="paymentRows"></tbody></table></div></div>
+</section>
+
+<section id="reports" class="page">
+<div class="grid">
+<div class="card"><div class="muted">Total Revenue</div><div class="metric" id="rRevenue">₦0</div></div>
+<div class="card"><div class="muted">Total Orders</div><div class="metric" id="rOrders">0</div></div>
+<div class="card"><div class="muted">Delivered</div><div class="metric" id="rDelivered">0</div></div>
+<div class="card"><div class="muted">Unpaid/Part-paid</div><div class="metric" id="rUnpaid">0</div></div>
+</div>
+<div class="section card"><h2>Business Summary</h2><p class="muted">Use the Payments and Orders sections to review individual records. Data is stored locally in this browser for this prototype.</p></div>
+</section>
+</main></div>
+
+<div id="modal" class="modal hidden"><div class="modalbox"><div class="modalhead"><h2 id="modalTitle"></h2><button class="x" onclick="closeModal()">×</button></div><div id="modalBody"></div></div></div>
+<script src="app.js"></script>
+</body>
+</html>
