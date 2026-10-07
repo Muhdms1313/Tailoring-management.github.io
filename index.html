@@ -9,18 +9,18 @@
 <body>
 <div class="app">
 <aside class="side"><div class="brand">TailorPro<small>Tailoring Management System</small></div><div class="nav">
-<button data-page="dashboard" class="active">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button>
+<button data-page="dashboard" class="active">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button><button data-page="settings">Settings</button>
 </div></aside>
-<div class="mobilebar"><button data-page="dashboard">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button></div>
+<div class="mobilebar"><button data-page="dashboard">Dashboard</button><button data-page="customers">Customers</button><button data-page="measurements">Measurements</button><button data-page="orders">Orders</button><button data-page="payments">Payments</button><button data-page="reports">Reports</button><button data-page="settings">Settings</button></div>
 <main class="main">
-<div class="top"><div><h1 id="pageTitle">Dashboard</h1><div class="muted">Manage your tailoring business in one place.</div></div><button class="btn" onclick="openCustomer()">+ New Customer</button></div>
+<div class="top"><div><h1 id="pageTitle">Dashboard</h1><div class="muted">Manage your tailoring business in one place.</div></div><div class="toolbar"><button class="btn secondary" onclick="backupData()">Backup</button><button class="btn" onclick="openCustomer()">+ New Customer</button></div></div>
 
 <section id="dashboard" class="page active">
 <div class="grid">
 <div class="card"><div class="muted">Customers</div><div class="metric" id="mCustomers">0</div></div>
 <div class="card"><div class="muted">Active Orders</div><div class="metric" id="mActive">0</div></div>
 <div class="card"><div class="muted">Due Today</div><div class="metric" id="mDue">0</div></div>
-<div class="card"><div class="muted">Outstanding Balance</div><div class="metric" id="mBalance">₦0</div></div>
+<div class="card"><div class="muted">Outstanding Balance</div><div class="metric" id="mBalance">₦0</div></div><div class="card"><div class="muted">Overdue Orders</div><div class="metric" id="mOverdue">0</div></div>
 </div>
 <div class="section"><div class="sectionhead"><h2>Recent Orders</h2><button class="btn secondary" onclick="openOrder()">+ New Order</button></div><div class="tablewrap"><table class="table"><thead><tr><th>Order</th><th>Customer</th><th>Outfit</th><th>Collection Date</th><th>Status</th><th>Balance</th></tr></thead><tbody id="recentOrders"></tbody></table></div></div>
 </section>
@@ -41,7 +41,7 @@
 </section>
 
 <section id="payments" class="page">
-<div class="section"><div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Order</th><th>Customer</th><th>Amount</th><th>Method</th></tr></thead><tbody id="paymentRows"></tbody></table></div></div>
+<div class="toolbar"><button class="btn" onclick="openPayment()">+ Record Payment</button></div><div class="section"><div class="tablewrap"><table class="table"><thead><tr><th>Date</th><th>Order</th><th>Customer</th><th>Amount</th><th>Method</th></tr></thead><tbody id="paymentRows"></tbody></table></div></div>
 </section>
 
 <section id="reports" class="page">
@@ -52,6 +52,13 @@
 <div class="card"><div class="muted">Unpaid/Part-paid</div><div class="metric" id="rUnpaid">0</div></div>
 </div>
 <div class="section card"><h2>Business Summary</h2><p class="muted">Use the Payments and Orders sections to review individual records. Data is stored locally in this browser for this prototype.</p></div>
+</section>
+<section id="settings" class="page">
+<div class="grid">
+<div class="card"><h2>Data Backup</h2><p class="muted">Export all customers, measurements, orders and payments to a JSON backup file.</p><button class="btn" onclick="backupData()">Download Backup</button></div>
+<div class="card"><h2>Restore Data</h2><p class="muted">Restore a TailorPro JSON backup. Existing data will be replaced.</p><input id="restoreFile" type="file" accept="application/json" onchange="restoreData(event)"></div>
+<div class="card"><h2>Business</h2><p class="muted">TailorPro Manager V2 · English · NGN</p><p class="muted">Local prototype with browser storage.</p></div>
+</div>
 </section>
 </main></div>
 
