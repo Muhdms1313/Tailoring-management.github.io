@@ -83,3 +83,194 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{display:fle
 
     overflow:auto;
                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               }
+/* =========================================
+   TAILORPRO PROFESSIONAL LOGIN DESIGN
+   ========================================= */
+
+#authScreen .auth-card {
+    width: 380px !important;
+    max-width: calc(100% - 36px) !important;
+
+    padding: 30px 28px !important;
+
+    background: rgba(5, 15, 28, 0.88) !important;
+
+    border: 2px solid #d4af37 !important;
+    border-radius: 20px !important;
+
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.75),
+        0 0 25px rgba(212, 175, 55, 0.25) !important;
+
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+
+    color: white !important;
+}
+
+/* TailorPro */
+#authScreen .auth-brand {
+    display: block !important;
+
+    text-align: center !important;
+
+    font-size: 34px !important;
+    font-weight: 900 !important;
+
+    color: white !important;
+
+    margin-bottom: 5px !important;
+}
+
+#authScreen .auth-brand span {
+    color: #d4af37 !important;
+}
+
+#authScreen .auth-subbrand {
+    display: block !important;
+
+    text-align: center !important;
+
+    color: #d9e2ee !important;
+
+    font-size: 13px !important;
+
+    margin-bottom: 25px !important;
+}
+
+/* Welcome back */
+#authScreen h2 {
+    text-align: center !important;
+
+    color: white !important;
+
+    font-size: 23px !important;
+
+    margin-bottom: 6px !important;
+}
+
+#authScreen .auth-help {
+    text-align: center !important;
+
+    color: #d5dce6 !important;
+
+    font-size: 13px !important;
+
+    margin-bottom: 20px !important;
+}
+
+/* Labels */
+#authScreen .auth-field label {
+    color: white !important;
+
+    font-size: 13px !important;
+
+    font-weight: 700 !important;
+
+    margin-bottom: 6px !important;
+}
+
+/* Inputs */
+#authScreen .auth-field input {
+    width: 100% !important;
+
+    height: 48px !important;
+
+    box-sizing: border-box !important;
+
+    padding: 12px 14px !important;
+
+    background: rgba(255,255,255,0.96) !important;
+
+    color: #172033 !important;
+
+    border: 1px solid #d4af37 !important;
+
+    border-radius: 10px !important;
+
+    font-size: 15px !important;
+
+    outline: none !important;
+}
+
+#authScreen .auth-field input:focus {
+    border-color: #ffffff !important;
+
+    box-shadow:
+        0 0 0 3px rgba(212,175,55,0.25) !important;
+}
+
+/* Login button */
+#authScreen .auth-submit {
+    width: 100% !important;
+
+    height: 48px !important;
+
+    margin-top: 8px !important;
+
+    border: none !important;
+
+    border-radius: 10px !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #0969b0,
+            #0b3158 55%,
+            #d4af37
+        ) !important;
+
+    color: white !important;
+
+    font-size: 16px !important;
+
+    font-weight: 900 !important;
+
+    cursor: pointer !important;
+
+    box-shadow:
+        0 8px 20px rgba(0,0,0,0.35) !important;
+}
+
+/* Sign up */
+#authScreen .auth-switch {
+    text-align: center !important;
+
+    color: #dbe4ef !important;
+
+    margin-top: 18px !important;
+
+    font-size: 13px !important;
+}
+
+#authScreen .auth-switch button {
+    color: #f0c75e !important;
+
+    font-weight: 900 !important;
+
+    background: none !important;
+
+    border: none !important;
+
+    cursor: pointer !important;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+
+    #authScreen .auth-card {
+        width: 350px !important;
+
+        max-width: calc(100% - 28px) !important;
+
+        padding: 25px 20px !important;
+    }
+
+    #authScreen .auth-brand {
+        font-size: 30px !important;
+    }
+
+    #authScreen h2 {
+        font-size: 21px !important;
+    }
+}
