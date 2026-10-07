@@ -64,14 +64,21 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.app{display:fle
 /* TailorPro Login Background */
 
 #authScreen {
-  background-image:
-    linear-gradient(
-      rgba(5, 15, 30, 0.62),
-      rgba(5, 10, 20, 0.78)
-    ),
-    url("login-background.jpg");
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
 
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         }
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 100% !important;
+    min-height: 100vh !important;
+
+    background:
+        linear-gradient(
+            rgba(0, 0, 0, 0.45),
+            rgba(0, 0, 0, 0.60)
+        ),
+        url("./login-background.jpg") center center / cover no-repeat !important;
+}
